@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Track Driver</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; margin: 0; }
+    #map { height: calc(100vh - 68px); }
+  </style>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#020617">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dispatch">
+  <meta name="msapplication-TileColor" content="#020617">
+  <meta name="msapplication-TileImage" content="icons/icon-144.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="apple-touch-startup-image" href="splash/iphone5.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphone678.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphone678plus.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/iphonex.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/iphonexr.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphonexsmax.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/ipad.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/ipadpro10.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/ipadpro12.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+</head>
+<body class="bg-slate-950 text-slate-100">
+  <div class="p-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3">
+    <div class="min-w-0">
+      <h1 id="driver-title" class="text-sm font-bold truncate">Tracking driver...</h1>
+      <p id="last-update" class="text-xs text-slate-400">Waiting for a GPS report...</p>
+    </div>
+    <a id="gmaps-link" href="#" target="_blank" rel="noopener" class="hidden shrink-0 text-xs font-bold text-indigo-400 hover:text-indigo-300 border border-indigo-800 rounded-lg px-3 py-1.5">
+      Open in Google Maps ↗
+    </a>
+  </div>
+
+  <div id="map"></div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const driverId = params.get('driver');
+
+    if (!driverId) {
+      document.getElementById('driver-title').textContent = 'No driver specified';
+      document.getElementById('last-update').textContent = 'Add ?driver=<driver id> to the URL, e.g. track_driver.html?driver=alex';
+    }
+
+    const map = L.map('map').setView([20.5937, 78.9629], 5); // default view: India
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      maxZoom: 19
+    }).addTo(map);
+
+    let marker = null;
+
+    function secondsAgoText(mysqlTimestamp) {
+      // database_configuration.php's server timestamp, treated as UTC
+      const updated = new Date(mysqlTimestamp.replace(' ', 'T') + 'Z');
+      const seconds = Math.max(0, Math.round((Date.now() - updated.getTime()) / 1000));
+      if (seconds < 60) return `${seconds}s ago`;
+      if (seconds < 3600) return `${Math.round(seconds / 60)}m ago`;
+      return `${Math.round(seconds / 3600)}h ago`;
+    }
+
+    async function poll() {
+      if (!driverId) return;
+      try {
+        const res = await fetch(`api/get_driver_locations_api.php?driver_id=${encodeURIComponent(driverId)}`);
+        const data = await res.json();
+
+        if (data.status !== 'success' || data.data.lat === null || data.data.lng === null) {
+          document.getElementById('driver-title').textContent = data.data && data.data.name ? data.data.name : driverId;
+          document.getElementById('last-update').textContent = 'No GPS report received from this driver yet. Open the Driver App on their phone and tap "Engage navigation telemetry" to start sending real location.';
+          return;
+        }
+
+        const { name, lat, lng, location_updated_at } = data.data;
+        document.getElementById('driver-title').textContent = `${name || driverId} — live location`;
+        document.getElementById('last-update').textContent = `Last updated ${secondsAgoText(location_updated_at)}`;
+
+        const gmapsLink = document.getElementById('gmaps-link');
+        gmapsLink.href = `https://www.google.com/maps?q=${lat},${lng}`;
+        gmapsLink.classList.remove('hidden');
+
+        const latLng = [parseFloat(lat), parseFloat(lng)];
+        if (!marker) {
+          marker = L.marker(latLng).addTo(map);
+          map.setView(latLng, 16);
+        } else {
+          marker.setLatLng(latLng);
+        }
+      } catch (err) {
+        document.getElementById('last-update').textContent = 'Could not reach the location API.';
+      }
+    }
+
+    poll();
+    setInterval(poll, 10000); // refresh every 10s
+  </script>
+  <script src="assets/pwa-controller.js" defer></script>
+</body>
+</html>

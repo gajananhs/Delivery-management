@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Import Suppliers</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#020617">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Dispatch">
+  <meta name="msapplication-TileColor" content="#020617">
+  <meta name="msapplication-TileImage" content="icons/icon-144.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png">
+  <link rel="apple-touch-icon" sizes="152x152" href="icons/icon-152.png">
+  <link rel="apple-touch-icon" sizes="144x144" href="icons/icon-144.png">
+  <link rel="apple-touch-icon" sizes="128x128" href="icons/icon-128.png">
+  <link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="icons/icon-512.png">
+  <link rel="apple-touch-startup-image" href="splash/iphone5.png" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphone678.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphone678plus.png" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/iphonex.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/iphonexr.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/iphonexsmax.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)">
+  <link rel="apple-touch-startup-image" href="splash/ipad.png" media="(device-width: 768px) and (device-height: 1024px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/ipadpro10.png" media="(device-width: 834px) and (device-height: 1112px) and (-webkit-device-pixel-ratio: 2)">
+  <link rel="apple-touch-startup-image" href="splash/ipadpro12.png" media="(device-width: 1024px) and (device-height: 1366px) and (-webkit-device-pixel-ratio: 2)">
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6">
+  <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
+    <div>
+      <h1 class="text-lg font-bold">Import Suppliers</h1>
+      <p class="text-xs text-slate-500 mt-1">
+        Upload the file exported from canaresai.com &rarr; Procurement &rarr; Suppliers &rarr;
+        <span class="font-semibold">Export</span> &mdash; either the CSV as downloaded, or that
+        same file re-saved as .xlsx. Re-uploading a newer export is safe: existing supplier codes
+        are updated, new codes are added.
+      </p>
+    </div>
+
+    <form id="import-form" class="space-y-3">
+      <input type="file" name="file" id="csv-file" accept=".csv,.xlsx" required
+        class="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500">
+      <button type="submit" id="import-btn"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors">
+        Upload &amp; Import
+      </button>
+    </form>
+
+    <div id="result" class="hidden text-xs rounded-xl p-3 border"></div>
+
+    <a href="index.html" class="block text-center text-xs text-indigo-600 font-semibold pt-1">
+      &larr; Back to Dispatch Dashboard
+    </a>
+  </div>
+
+  <script>
+    document.getElementById('import-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('csv-file');
+      const btn = document.getElementById('import-btn');
+      const resultBox = document.getElementById('result');
+
+      if (!fileInput.files.length) return;
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      btn.disabled = true;
+      btn.textContent = 'Importing...';
+      resultBox.classList.add('hidden');
+
+      try {
+        const res = await fetch('api/import_suppliers_api.php', { method: 'POST', body: formData });
+        const data = await res.json();
+
+        resultBox.classList.remove('hidden');
+        if (data.status === 'success') {
+          resultBox.className = 'text-xs rounded-xl p-3 border bg-emerald-50 border-emerald-200 text-emerald-800';
+          resultBox.innerHTML = `Imported successfully &mdash; <b>${data.data.created}</b> added, <b>${data.data.updated}</b> updated.` +
+            (data.data.errors.length ? `<br><span class="text-amber-700">${data.data.errors.length} row(s) skipped: ${data.data.errors.join('; ')}</span>` : '');
+        } else {
+          resultBox.className = 'text-xs rounded-xl p-3 border bg-red-50 border-red-200 text-red-800';
+          resultBox.textContent = data.message || 'Import failed.';
+        }
+      } catch (err) {
+        resultBox.classList.remove('hidden');
+        resultBox.className = 'text-xs rounded-xl p-3 border bg-red-50 border-red-200 text-red-800';
+        resultBox.textContent = 'Could not reach the import API.';
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Upload & Import';
+      }
+    });
+  </script>
+  <script src="assets/pwa-controller.js" defer></script>
+</body>
+</html>

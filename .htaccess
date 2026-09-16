@@ -1,0 +1,39 @@
+# --- Force HTTPS (required for service workers / installability) ---
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteCond %{HTTPS} off
+  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# --- Correct MIME type for the manifest ---
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+  AddType application/manifest+json .json
+</IfModule>
+
+# --- Cache-Control rules ---
+# service-worker.js must NEVER be cached by the browser HTTP layer, or
+# updates will not be picked up (this is separate from the SW's own
+# Workbox caches, which are versioned and updated correctly already).
+<IfModule mod_headers.c>
+  <FilesMatch "service-worker\.js$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires 0
+  </FilesMatch>
+
+  <FilesMatch "manifest\.json$">
+    Header set Cache-Control "no-cache, max-age=0"
+  </FilesMatch>
+
+  # Static assets can be cached long-term by the browser; Workbox handles
+  # invalidation via CACHE_VERSION on deploy.
+  <FilesMatch "\.(png|jpg|jpeg|svg|ico)$">
+    Header set Cache-Control "public, max-age=2592000"
+  </FilesMatch>
+</IfModule>
+
+# --- Gzip compression for performance ---
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/css application/javascript application/json image/svg+xml
+</IfModule>
