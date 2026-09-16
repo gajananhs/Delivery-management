@@ -3,23 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Import Suppliers</title>
+  <title>Import Customers</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-6">
   <div class="w-full max-w-md bg-white text-slate-800 rounded-2xl shadow-2xl p-6 space-y-4">
     <div>
-      <h1 class="text-lg font-bold">Import Suppliers</h1>
+      <h1 class="text-lg font-bold">Import Customers</h1>
       <p class="text-xs text-slate-500 mt-1">
-        Upload the file exported from canaresai.com &rarr; Procurement &rarr; Suppliers &rarr;
-        <span class="font-semibold">Export</span> &mdash; either the CSV as downloaded, or that
-        same file re-saved as .xlsx. Re-uploading a newer export is safe: existing supplier codes
-        are updated, new codes are added.
+        Upload the CSV exported from canaresai.com &rarr; Sales &rarr; Customers &rarr;
+        <span class="font-semibold">Export</span>. Only Bangalore-area customers (by city or
+        560xxx PIN) will show up in the dispatch form's dropdown &mdash; everything else is
+        imported too but filtered out there. Re-uploading a newer export is safe.
       </p>
     </div>
 
     <form id="import-form" class="space-y-3">
-      <input type="file" name="file" id="csv-file" accept=".csv,.xlsx" required
+      <input type="file" name="file" id="csv-file" accept=".csv" required
         class="w-full text-xs border border-slate-200 rounded-xl p-2.5 outline-none focus:border-indigo-500">
       <button type="submit" id="import-btn"
         class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-xl font-bold text-sm shadow-md transition-colors">
@@ -63,9 +63,8 @@
 
       let res;
       try {
-        res = await fetch(API_BASE + 'import_suppliers_api.php', { method: 'POST', body: formData });
+        res = await fetch(API_BASE + 'import_customers_api.php', { method: 'POST', body: formData });
       } catch (networkErr) {
-        // The request never reached the server at all (offline, DNS, CORS, mixed-content HTTP/HTTPS)
         resultBox.classList.remove('hidden');
         resultBox.className = 'text-xs rounded-xl p-3 border bg-red-50 border-red-200 text-red-800';
         resultBox.textContent = `Network error: could not send the request at all (${networkErr.message}). Check you're on the same https:// domain as this page.`;
@@ -74,9 +73,6 @@
         return;
       }
 
-      // Read as text first: a PHP fatal error or a 404 page comes back as
-      // HTML, not JSON, and res.json() would just throw a useless
-      // "unexpected token" error that hides what actually went wrong.
       const rawText = await res.text();
       let data = null;
       try {
@@ -85,7 +81,7 @@
         resultBox.classList.remove('hidden');
         resultBox.className = 'text-xs rounded-xl p-3 border bg-red-50 border-red-200 text-red-800';
         resultBox.innerHTML = `Server returned HTTP ${res.status} but not valid JSON, so something failed before the PHP script could respond ` +
-          `(missing api/import_suppliers_api.php on the server, a wrong path to database_configuration.php, or a PHP error). Raw response:<br>` +
+          `(missing api/import_customers_api.php on the server, a wrong path to database_configuration.php, or a PHP error). Raw response:<br>` +
           `<code class="block mt-1 p-2 bg-red-100 rounded text-[10px] whitespace-pre-wrap break-all">${escapeHtml(rawText.slice(0, 500)) || '(empty response)'}</code>`;
         btn.disabled = false;
         btn.textContent = 'Upload & Import';
