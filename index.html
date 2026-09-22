@@ -103,8 +103,6 @@
                   <input type="hidden" name="type" id="task-type-input" value="delivery">
                 </div>
 
-                <datalist id="customer-datalist"></datalist>
-
                 <!-- One or more delivery stops. Cloned from #delivery-stop-template by JS -->
                 <div id="delivery-stops-container" class="space-y-4"></div>
 
@@ -150,7 +148,9 @@
                     </button>
                   </div>
                 </div>
-                <input type="text" class="stop-customer w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-indigo-500" list="customer-datalist" required placeholder="e.g. Stark Industries">
+                <select class="stop-customer w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-indigo-500" required>
+                  <option value="">— Select customer —</option>
+                </select>
               </div>
               <div>
                 <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Customer Phone Number</label>
@@ -191,6 +191,11 @@
                   </button>
                 </div>
                 <div class="stop-items-container space-y-2"></div>
+                <div class="mt-2">
+                  <label class="block text-[10px] font-semibold text-slate-400 mb-1">Or upload the whole item list as a PDF (optional)</label>
+                  <input type="file" accept="application/pdf" class="stop-items-pdf w-full bg-white border border-slate-200 rounded-xl p-2 text-xs outline-none focus:border-indigo-500">
+                  <div class="stop-items-pdf-status text-[10px] text-slate-400 mt-1"></div>
+                </div>
               </div>
             </div>
           </template>
@@ -288,24 +293,6 @@
               </form>
             </div>
 
-            <!-- New Item Registration Form -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <button id="btn-toggle-add-item" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <span>+ Register New Item</span>
-                <span id="add-item-arrow" class="transition-transform">▼</span>
-              </button>
-              <form id="add-item-form" class="space-y-3 mt-3 hidden">
-                <input type="text" name="name" required placeholder="Item name (e.g. MS Elbow 2 inch)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                <div class="grid grid-cols-2 gap-2">
-                  <input type="text" name="code" placeholder="Item code (optional)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="unit" placeholder="Unit (Nos/Kg/Mtr/Box)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
-                  Add Item
-                </button>
-              </form>
-            </div>
-
             <div>
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Driver Registries</h3>
               <div id="drivers-list-container" class="space-y-2"></div>
@@ -313,18 +300,6 @@
             <div>
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Vehicle Matrix</h3>
               <div id="vehicles-list-container" class="space-y-2"></div>
-            </div>
-            <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Customer Directory</h3>
-              <div id="customers-list-container" class="space-y-2"></div>
-            </div>
-            <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Supplier Directory</h3>
-              <div id="suppliers-list-container" class="space-y-2"></div>
-            </div>
-            <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Item Master</h3>
-              <div id="items-list-container" class="space-y-2"></div>
             </div>
           </div>
 
@@ -666,22 +641,65 @@
         addItemRow(e.target.closest('.delivery-stop'));
       });
 
-      // Autofill the phone number when the typed name matches a saved
-      // customer (picked from the datalist); still freely editable/overridable
-      // for a one-off customer that isn't saved yet.
-      clone.querySelector('.stop-customer').addEventListener('input', (e) => {
+      // Autofill the phone number from the registered customer's own record
+      // when one is picked from the dropdown.
+      clone.querySelector('.stop-customer').addEventListener('change', (e) => {
         const stopEl = e.target.closest('.delivery-stop');
-        const match = state.customers.find(c => c.name.toLowerCase() === e.target.value.trim().toLowerCase());
-        if (match && match.phone) {
-          stopEl.querySelector('.stop-customer-phone').value = match.phone;
-        }
+        const match = state.customers.find(c => c.name === e.target.value);
+        stopEl.querySelector('.stop-customer-phone').value = (match && match.phone) ? match.phone : '';
+      });
+
+      // Whole-item-list PDF upload (alternative to typing item rows one by
+      // one) - uploads immediately on file pick and remembers the returned
+      // URL on the stop element for the dispatch submit to pick up.
+      clone.querySelector('.stop-items-pdf').addEventListener('change', (e) => {
+        uploadStopItemsPdf(e.target.closest('.delivery-stop'), e.target.files[0]);
       });
 
       container.appendChild(clone);
       const newStopEl = container.lastElementChild;
       populateSupplierSelect(newStopEl.querySelector('.stop-supplier'));
+      populateCustomerSelect(newStopEl.querySelector('.stop-customer'));
       addItemRow(newStopEl); // seed with one blank item row
       renumberDeliveryStops();
+    }
+
+    // Uploads a stop's "whole items list" PDF right away and stores the
+    // resulting URL as a data attribute on the stop element, so the
+    // dispatch-form submit can just read it along with the other fields.
+    async function uploadStopItemsPdf(stopEl, file) {
+      const statusEl = stopEl.querySelector('.stop-items-pdf-status');
+      if (!file) {
+        delete stopEl.dataset.itemsPdfUrl;
+        statusEl.textContent = '';
+        return;
+      }
+      if (file.type !== 'application/pdf') {
+        statusEl.textContent = 'Please choose a PDF file.';
+        statusEl.className = 'stop-items-pdf-status text-[10px] text-red-500 mt-1';
+        stopEl.querySelector('.stop-items-pdf').value = '';
+        delete stopEl.dataset.itemsPdfUrl;
+        return;
+      }
+      statusEl.textContent = `Uploading ${file.name}…`;
+      statusEl.className = 'stop-items-pdf-status text-[10px] text-slate-400 mt-1';
+      try {
+        const formData = new FormData();
+        formData.append('pdf', file);
+        const res = await fetch(`${API_BASE}upload_task_pdf_api.php`, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (data.status === 'success') {
+          stopEl.dataset.itemsPdfUrl = data.data.url;
+          statusEl.textContent = `✓ ${file.name} uploaded`;
+          statusEl.className = 'stop-items-pdf-status text-[10px] text-emerald-600 mt-1';
+        } else {
+          throw new Error(data.message || 'Upload failed');
+        }
+      } catch (err) {
+        delete stopEl.dataset.itemsPdfUrl;
+        statusEl.textContent = 'Upload failed - try again.';
+        statusEl.className = 'stop-items-pdf-status text-[10px] text-red-500 mt-1';
+      }
     }
 
     // --- One item line (name/qty/unit) inside a delivery stop's item list ---
@@ -747,7 +765,6 @@
         ['btn-toggle-add-vehicle', 'add-vehicle-form', 'add-vehicle-arrow'],
         ['btn-toggle-add-customer', 'add-customer-form', 'add-customer-arrow'],
         ['btn-toggle-add-supplier', 'add-supplier-form', 'add-supplier-arrow'],
-        ['btn-toggle-add-item', 'add-item-form', 'add-item-arrow'],
       ];
       toggles.forEach(([btnId, formId, arrowId]) => {
         const btn = document.getElementById(btnId);
@@ -978,29 +995,6 @@
         }
       });
 
-      // New: Register Item (item master list)
-      document.getElementById('add-item-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const form = e.target;
-        const payload = {
-          name: form.name.value.trim(),
-          code: form.code.value.trim().toUpperCase(),
-          unit: form.unit.value.trim()
-        };
-
-        try {
-          const res = await fetchApi('api/add_item_api.php', 'POST', payload);
-          if (res.status === 'success') {
-            triggerToast(`Item "${payload.name}" saved to Database!`);
-            form.reset();
-            document.getElementById('btn-toggle-add-item').click();
-            pollDatabaseState();
-          }
-        } catch (err) {
-          triggerToast("Failed to save item", true);
-        }
-      });
-
       // 3. Employee creates one or more delivery/collection stops and directly dispatches
       document.getElementById('create-task-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -1022,7 +1016,8 @@
           area: el.querySelector('.stop-area').value.trim(),
           exact_address: el.querySelector('.stop-address').value.trim(),
           supplier_code: el.querySelector('.stop-supplier').value,
-          items: collectStopItems(el)
+          items: collectStopItems(el),
+          items_pdf_url: el.dataset.itemsPdfUrl || ''
         }));
 
         if (stops.length === 0 || stops.some(s => !s.customer || !s.area || !s.exact_address)) {
@@ -1262,14 +1257,12 @@
         ? allVehicles.map(v => `<option value="${v.id}">${v.plate} (${v.model}) - Fuel: ${v.fuel}%${v.status !== 'Available' ? ` — ${v.status}, extra task` : ''}</option>`).join('')
         : `<option value="">No vehicles registered</option>`;
 
-      // Every delivery-stop block on the dispatch form gets its own supplier picker
+      // Every delivery-stop block on the dispatch form gets its own supplier
+      // and customer picker - both are pure dropdowns onto the registered
+      // directories now (see Live Register's registration forms for adding
+      // new ones); there's no separate browsable directory list anymore.
       document.querySelectorAll('.stop-supplier').forEach(populateSupplierSelect);
-
-      // Customer autocomplete for every stop's "Customer / Company" field
-      const customerList = document.getElementById('customer-datalist');
-      if (customerList) {
-        customerList.innerHTML = state.customers.map(c => `<option value="${c.name}"></option>`).join('');
-      }
+      document.querySelectorAll('.stop-customer').forEach(populateCustomerSelect);
 
       // Item name autocomplete for every stop's item rows
       const itemsList = document.getElementById('items-datalist');
@@ -1284,6 +1277,19 @@
       selectEl.innerHTML = state.suppliers.length
         ? blankOption + state.suppliers.map(s => `<option value="${s.code}">${s.code} — ${s.name}${s.phone ? ' · ' + s.phone : ''}${s.city ? ' (' + s.city + ')' : ''}</option>`).join('')
         : `<option value="">No suppliers registered yet</option>`;
+    }
+
+    function populateCustomerSelect(selectEl) {
+      if (!selectEl) return;
+      const current = selectEl.value;
+      const blankOption = `<option value="">— Select customer —</option>`;
+      selectEl.innerHTML = state.customers.length
+        ? blankOption + state.customers.map(c => `<option value="${c.name}">${c.name}${c.phone ? ' · ' + c.phone : ''}</option>`).join('')
+        : `<option value="">No customers registered yet</option>`;
+      // Keep whatever was already picked, if it's still in the refreshed list
+      if (current && state.customers.some(c => c.name === current)) {
+        selectEl.value = current;
+      }
     }
 
     // --- STREAMING_CHUNK: Drawing live data registers... ---
@@ -1359,48 +1365,6 @@
           </div>
         `).join('');
       }
-
-      const custContainer = document.getElementById('customers-list-container');
-      if (custContainer) {
-        custContainer.innerHTML = state.customers.length
-          ? state.customers.map(c => `
-            <div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm">
-              <div class="font-bold text-slate-800 text-sm">${c.name}</div>
-              <div class="text-[10px] text-slate-400 mt-0.5">${c.phone || 'No contact number'}${c.city ? ' · ' + c.city : ''}</div>
-            </div>
-          `).join('')
-          : `<div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl"><p class="text-xs text-slate-400 font-semibold">No customers registered yet.</p></div>`;
-      }
-
-      const supContainer = document.getElementById('suppliers-list-container');
-      if (supContainer) {
-        supContainer.innerHTML = state.suppliers.length
-          ? state.suppliers.map(s => `
-            <div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-              <div>
-                <div class="font-bold text-slate-800 text-sm">${s.code} — ${s.name}</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">${s.phone || 'No contact number'}${s.city ? ' · ' + s.city : ''}</div>
-              </div>
-              <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${s.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${s.status || 'active'}</span>
-            </div>
-          `).join('')
-          : `<div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl"><p class="text-xs text-slate-400 font-semibold">No suppliers registered yet.</p></div>`;
-      }
-
-      const itemsContainer = document.getElementById('items-list-container');
-      if (itemsContainer) {
-        itemsContainer.innerHTML = state.items.length
-          ? state.items.map(i => `
-            <div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
-              <div>
-                <div class="font-bold text-slate-800 text-sm">${i.name}</div>
-                <div class="text-[10px] text-slate-400 mt-0.5">${i.code}${i.unit ? ' · ' + i.unit : ''}</div>
-              </div>
-              <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${i.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${i.status || 'active'}</span>
-            </div>
-          `).join('')
-          : `<div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl"><p class="text-xs text-slate-400 font-semibold">No items registered yet.</p></div>`;
-      }
     }
 
     // Renders a task's item lines as "2 Nos MS Elbow, 5 Kg Flange" style text
@@ -1461,6 +1425,10 @@
             <div class="col-span-2 pt-1 border-t border-slate-100">
               <span class="text-slate-400 font-semibold block text-[10px] uppercase">Items</span>
               <span class="text-slate-700 font-bold">${formatItemsList(t.items)}</span>
+            </div>` : ''}
+            ${t.items_pdf_url ? `
+            <div class="col-span-2 pt-1 border-t border-slate-100">
+              <a href="${t.items_pdf_url}" target="_blank" class="text-indigo-600 font-bold text-[11px]">📄 View Items List PDF</a>
             </div>` : ''}
           </div>
           ${(t.status === 'assigned' || t.status === 'in_transit') && t.driver_id
@@ -1633,6 +1601,10 @@
                 <ul class="space-y-0.5">
                   ${t.items.map(i => `<li class="font-semibold text-slate-800">• ${i.quantity && Number(i.quantity) !== 1 ? `${i.quantity}${i.unit ? ' ' + i.unit : ''} ` : (i.unit ? `${i.unit} ` : '')}${i.item_name}</li>`).join('')}
                 </ul>
+              </div>` : ''}
+              ${t.items_pdf_url ? `
+              <div class="pt-1.5 border-t border-slate-200">
+                <a href="${t.items_pdf_url}" target="_blank" class="text-indigo-600 font-bold text-[11px]">📄 View Items List PDF</a>
               </div>` : ''}
             </div>
 

@@ -53,3 +53,8 @@ CREATE TABLE IF NOT EXISTS task_items (
   created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   KEY task_id_idx (task_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- 6. Whole "items list" PDF upload on the dispatch form, as an alternative
+-- to typing individual item rows - see api/upload_task_pdf_api.php, which
+-- saves the file under /uploads/task_pdfs/ and returns this URL.
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS items_pdf_url VARCHAR(500) NULL;
