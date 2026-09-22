@@ -1,78 +1,96 @@
-# Direct Dispatch & Fleet Controller — PWA (production build)
+# TallyField — reference PWA scaffold
 
-## Stack (unchanged)
-- Frontend: plain HTML + vanilla JavaScript + Tailwind CDN (JIT, runtime)
-- Backend: PHP + PDO, MySQL — untouched
-- No React/Next.js/Node/build step was introduced. All PWA functionality
-  below is added as static files + a service worker, loaded directly by
-  the browser, exactly like the existing `assets/frontend_application_controller.js`.
+A working starting point, not a finished product: front end (installable
+PWA), PHP/PDO/MySQL API, and a service worker, built to match the
+[[tallyfield]] blueprint, screen spec, and Launch Checklist, with every
+fix from the Release QA Pass already applied.
 
-## What was added (nothing existing was removed or rewritten)
-| File | Purpose |
-|---|---|
-| `manifest.json` | App identity, 11 icon sizes (incl. maskable), shortcuts, display mode |
-| `service-worker.js` | Workbox-based caching (loaded via CDN `importScripts`, no build step) |
-| `assets/pwa-controller.js` | SW registration, auto-update banner, online/offline banner — included on all 3 pages |
-| `offline.html` | Fallback page shown when fully offline and nothing cached |
-| `icons/` | 9 regular icon sizes (72–512px) + 2 maskable icons |
-| `splash/` | 9 iOS splash screens for common iPhone/iPad viewports |
-| `.htaccess` | HTTPS redirect, correct manifest MIME type, cache-control (critical: `service-worker.js` is never browser-cached), gzip |
-| Head tags in `index.html` / `track_driver.html` / `import_suppliers.html` | manifest link, theme-color, Apple/Windows PWA meta tags, icon links, splash-screen links |
+## What's here
 
-## Caching strategy (in `service-worker.js`)
-- **`/api/*.php` → NetworkOnly, never cached.** Live dispatch/task/location
-  data must always come from the network.
-- **HTML pages → NetworkFirst** (8s timeout), falls back to cache, then to
-  `offline.html`. Always shows the latest page when online.
-- **Tailwind CDN script → CacheFirst.** So the app still renders its styling
-  when opened offline (it's cached after first load).
-- **Local JS → StaleWhileRevalidate.** Fast load, refreshes in background.
-- **Icons/images → CacheFirst**, capped and expired automatically.
+```
+index.html             Complete, self-contained PWA — all 10 screens (Login,
+                        Rep Home, Customer Detail, Check-in, Log Outcome, Sync
+                        Status, Owner Dashboard, Rep Drilldown, Reports,
+                        Settings), mock data, and logic inline. Published at
+                        the repo root so GitHub Pages works with the default
+                        "/(root)" source.
+manifest.json, service-worker.js, icons/, splash/, .nojekyll, 404.html
+                       Supporting PWA files for the root build.
+docs/                  Identical copy of the above, for the "/docs" Pages
+                       source option instead, if you prefer that layout.
+tools/generate-icons.py  Regenerates icons/ and splash/ (needs Pillow).
+schema.sql             Production schema (scheduled_date + feed index fixes included)
+seed.sql               Dev/demo data only — never run against production
+api/
+  config.php            DB connection, requireAuth(), error logging
+  auth/                 send-otp.php, verify-otp.php, logout.php
+  visits/               list.php, checkin.php
+  customers/             get.php
+  field-transactions/   create.php, list.php, retry.php
+  owner/                 dashboard.php
+public/                  Backend-connected PWA build — needs api/ + a real MySQL host
+  index.html             App shell (phone/OTP login, real fetch() calls to api/)
+  app.js                 Router, screens, real fetch() calls to api/
+  queue.js               IndexedDB offline queue for check-in / log outcome
+  service-worker.js      Workbox — precaches the shell, NetworkOnly for /api/
+  manifest.json           PWA installability
+  icons/, splash/         Same generated icon/splash set as the root build
+DEPLOY.md               GitHub Pages setup steps, PWA implementation notes, test checklist
+```
 
-## Auto-updates
-New deploys take effect automatically (`skipWaiting` + `clients.claim()` in
-the service worker) — no manual "update" action is required from the user.
-For anyone with the app already open in a tab, a small "App updated —
-Refresh" banner appears once the new version has taken over, rather than
-force-reloading mid-task (this is a live ops app; an unannounced reload
-could interrupt an in-progress dispatch or delivery update).
+## QA fixes already applied here
 
-## Online/offline detection
-`assets/pwa-controller.js` shows a small banner at the bottom of the screen
-when the connection drops ("You are offline — showing cached data...") and
-briefly on reconnect ("Back online"). This is independent of Tailwind, so it
-still displays even if the CDN script hasn't loaded.
+Everything flagged in the Release QA Pass is fixed in this scaffold, not
+just documented:
 
-## Installability
-With HTTPS + the manifest + the service worker in place, Chrome/Edge/Android
-will show an automatic "Install app" prompt, and iOS Safari supports
-"Add to Home Screen" from the Share menu (the splash screens and
-`apple-mobile-web-app-*` meta tags make that install look native on iOS,
-since iOS doesn't yet auto-apply `manifest.json`'s icons/splash the way
-Android does).
+- **Defect 1** (OTP brute-force) — `send-otp.php` rate-limits to 5 sends/hour per user before generating a new code
+- **Defect 2** (Order submission contract) — `create.php` validates Orders on `items_json`, not `amount`; the front end collects the right fields per type
+- **Defect 3** (visit date logic) — `visits.scheduled_date` replaces the broken `COALESCE(checkin_time, NOW())` filter
+- **Defect 4** (phone enumeration) — `send-otp.php` returns the same response whether or not the phone is registered
+- **Defect 5** (XSS) — every dynamic value in `app.js` goes through `esc()` before hitting `innerHTML`
+- **Defect 6** (stale UI state) — `checkinPhoto`, `checkinGpsState`, and `outcomeType` are reset at the top of their `wire*()` functions on every screen entry
+- **Defect 7** (dropped form fields) — the Log Outcome submit handler now reads every field per type into the actual payload
+- **Defect 8** (missing index) — `idx_ft_tenant_created` added; the dashboard feed query is also bounded to the last 7 days
+- **Defect 9** (duplicate check-in / upload size) — `checkin.php` returns the existing visit instead of creating a duplicate, and rejects a `photo_base64` over ~4 MB
+- **Defect 10** (no current-user concept) — the front end now authenticates for real; every screen's data comes from the session-scoped API, not a hardcoded mock user
 
-## Deployment (production)
-1. Upload the **entire contents of this folder** to your Hostinger
-   `public_html/delivery/` folder (same as before), overwriting the existing
-   files. `database_configuration.php` and everything in `api/` are
-   unchanged — no database or backend redeployment needed.
-2. Confirm the site is served over **HTTPS** (already true on
-   canaresonline.com) — service workers refuse to register on plain HTTP.
-3. Visit `https://canaresonline.com/delivery/index.html`, open DevTools →
-   Application tab, and confirm:
-   - **Manifest** section shows the app name/icons with no errors
-   - **Service Workers** section shows it as "activated and running"
-4. Run a Lighthouse audit (DevTools → Lighthouse → PWA category) to confirm
-   installability and get a performance score.
-5. On future deploys: bump `CACHE_VERSION` at the top of `service-worker.js`
-   (e.g. `v1` → `v2`) before re-uploading, so returning users' browsers pick
-   up the new cache instead of reusing stale precached files.
+## What's stubbed, on purpose
 
-## Known limitation
-Tailwind is loaded via its CDN JIT script rather than a compiled stylesheet
-(this was true before this change too). It's cached after first load for
-offline use, but a brand-new install with zero connectivity on its very
-first visit won't have it cached yet. This is inherent to using the Tailwind
-CDN approach and wasn't introduced by the PWA conversion; switching to a
-compiled Tailwind build would need a Node build step, which this task
-intentionally avoided to keep the existing stack unchanged.
+This is a reference scaffold, not the full app — it covers the core loop
+(login → check-in → log outcome → sync) end to end. Not yet built, but
+following the exact same `config.php` + `requireAuth()` + `esc()`
+patterns already in place:
+
+- Rep Drilldown, Reports, and Settings screens/endpoints
+- Real SMS sending in `send-otp.php` (the `// BACKEND:` comment marks where)
+- Photo upload to real storage in `checkin.php` (same marker)
+- The Windows desktop Tally sync agent itself — this scaffold's API writes
+  `field_transactions` rows for the agent to pick up; the agent is the
+  existing one from [[capl-mobile-apps]], reused as-is per the blueprint
+
+## Deploying, per the Launch Checklist
+
+1. Run `schema.sql` against a fresh production MySQL database — **do not** run `seed.sql` there
+2. Set `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASS` as environment variables on the Hostinger PHP runtime; confirm `config.php` never falls back to its empty defaults
+3. Upload `api/` and the contents of `public/` to the subdomain's web root (`public/index.html` becomes the site's `index.html`)
+4. Confirm HTTPS is issued for the exact subdomain before go-live
+5. Insert the real `tenants` and `users` rows (owner + first rep, real phone numbers) — replace, don't append to, any test rows
+6. Point the existing desktop Tally sync agent at this tenant's `field_transactions` queue
+7. Run the Go-Live Sequence's T-15-minute smoke test (login, check-in, log a real collection, confirm it reaches `sync_status = synced` and appears correctly in Tally) before inviting the first real rep
+
+## Local development
+
+Any PHP 8+ / MySQL setup works. Quick start:
+
+```bash
+mysql -u root -p tallyfield < schema.sql
+mysql -u root -p tallyfield < seed.sql   # dev only
+php -S localhost:8080 -t public
+```
+
+Point `api/config.php`'s defaults at your local MySQL, or export the four
+`DB_*` environment variables before starting PHP's built-in server. The
+API isn't reachable at `localhost:8080/api/...` this way unless you also
+serve `api/` from the same document root — for local testing, symlink or
+copy `api/` into `public/api/`, or run a second `php -S` instance for it
+and adjust `API_BASE` in `app.js` accordingly.

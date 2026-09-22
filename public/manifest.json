@@ -1,7 +1,7 @@
 {
   "name": "TallyField",
   "short_name": "TallyField",
-  "description": "Live Tally balances and field visit logging for SME sales teams. (Demo build — mock data, no backend.)",
+  "description": "Live Tally balances and field visit logging for SME sales teams.",
   "start_url": ".",
   "scope": ".",
   "id": ".",

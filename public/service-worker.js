@@ -1,28 +1,28 @@
 // ============================================================
-// TallyField — service worker (Workbox, GitHub Pages / static build)
-// Registered with a relative path (./service-worker.js) so its scope
-// resolves correctly under a project subpath like
-// https://<user>.github.io/<repo>/ — an absolute "/service-worker.js"
-// registration would scope to the domain root and fail on Pages.
+// TallyField — service worker (Workbox, backend-connected build)
+// Registered as ./service-worker.js (relative) so it works whether this
+// is deployed at a domain root or a subpath. API calls under /api/ are
+// explicitly excluded from every cache — they carry session tokens and
+// must always reach the real PHP backend, or fail so the app's own
+// IndexedDB queue (queue.js) can take over. Nothing about the database
+// or server-side behavior changes here; this file only affects what the
+// browser caches.
 // ============================================================
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.1.0/workbox-sw.js');
 
-const VERSION = 'v3';
+const VERSION = 'v2';
 
 if (workbox) {
   workbox.setConfig({ debug: false });
-
-  // Take over immediately on install/activate so updates apply without
-  // needing every tab closed — paired with the page-side reload-once
-  // listener in index.html for a fully automatic update flow.
   workbox.core.skipWaiting();
   workbox.core.clientsClaim();
 
-  // --- App shell: precached so the whole app opens with zero network ---
   workbox.precaching.precacheAndRoute([
     { url: './', revision: VERSION },
     { url: './index.html', revision: VERSION },
+    { url: './app.js', revision: VERSION },
+    { url: './queue.js', revision: VERSION },
     { url: './manifest.json', revision: VERSION },
     { url: './icons/icon-192.png', revision: VERSION },
     { url: './icons/icon-512.png', revision: VERSION },
@@ -32,8 +32,14 @@ if (workbox) {
     { url: './icons/apple-touch-icon.png', revision: VERSION },
   ]);
 
-  // Any other same-origin navigation falls back to the app shell instead
-  // of a network error — this app has no server-side routes to miss.
+  // Never cache the API — always hit the network, and let a failure
+  // surface to the app's own queue/error handling instead of serving a
+  // stale cached response for a POST that changes data.
+  workbox.routing.registerRoute(
+    ({ url }) => url.pathname.includes('/api/'),
+    new workbox.strategies.NetworkOnly()
+  );
+
   workbox.routing.registerRoute(
     ({ request }) => request.mode === 'navigate',
     new workbox.strategies.NetworkFirst({
@@ -43,8 +49,6 @@ if (workbox) {
     })
   );
 
-  // Google Fonts: stylesheet revalidates in the background, font files
-  // are cached long-term once fetched — standard Workbox recipe.
   workbox.routing.registerRoute(
     ({ url }) => url.origin === 'https://fonts.googleapis.com',
     new workbox.strategies.StaleWhileRevalidate({ cacheName: 'google-fonts-stylesheets' })
@@ -60,28 +64,23 @@ if (workbox) {
     })
   );
 
-  // Any other static asset under this scope (images, icons added later):
-  // cache-first, since this build has no real API calls to worry about
-  // excluding — this build has no real API calls to worry about excluding, all state lives in localStorage.
   workbox.routing.registerRoute(
-    ({ request }) => ['image', 'font'].includes(request.destination),
+    ({ request, url }) => !url.pathname.includes('/api/') && ['image', 'font'].includes(request.destination),
     new workbox.strategies.CacheFirst({
       cacheName: 'tallyfield-assets',
       plugins: [new workbox.expiration.ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 })],
     })
   );
 } else {
-  // Workbox failed to load (offline on first install, CDN unreachable):
-  // fall back to a minimal hand-rolled cache so the app still installs.
   const CACHE_NAME = 'tallyfield-shell-fallback';
-  const SHELL = ['./', './index.html', './manifest.json'];
+  const SHELL = ['./', './index.html', './app.js', './queue.js', './manifest.json'];
   self.addEventListener('install', (e) => {
     e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)));
     self.skipWaiting();
   });
   self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
   self.addEventListener('fetch', (e) => {
-    if (e.request.method !== 'GET') return;
+    if (e.request.method !== 'GET' || e.request.url.includes('/api/')) return;
     e.respondWith(caches.match(e.request).then((c) => c || fetch(e.request).catch(() => caches.match('./index.html'))));
   });
 }
