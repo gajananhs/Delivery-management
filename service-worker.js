@@ -9,7 +9,7 @@
 // worker file never changed byte-for-byte, so browsers never even detected
 // there was a new version to install. Bump this on every future deploy
 // (v2 -> v3 -> v4 ...), otherwise this exact problem comes back.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.1.0/workbox-sw.js');
 

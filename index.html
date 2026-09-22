@@ -1680,6 +1680,20 @@
       showConfirm(`Delete driver "${driverName}"? This can't be undone.`, () => deleteDriver(driverId));
     };
 
+    // Browsers throw a generic network-level message (not a JSON error from
+    // our own API) when a fetch never got a response at all - almost always
+    // because the PHP file itself isn't on the server yet (a 404 page has no
+    // CORS header, so the browser reports it as this generic failure rather
+    // than a real HTTP status). Turn that into something actually actionable.
+    function describeApiError(err, filename) {
+      const msg = (err && err.message) || '';
+      const looksLikeNetworkFailure = /failed to fetch|networkerror|load failed/i.test(msg);
+      if (looksLikeNetworkFailure) {
+        return `Could not reach ${filename} on the server. Make sure that file is uploaded to the api/ folder on Hostinger, then try again.`;
+      }
+      return msg || 'Something went wrong.';
+    }
+
     async function deleteDriver(driverId) {
       try {
         const res = await fetchApi('api/delete_driver_api.php', 'POST', { id: driverId });
@@ -1694,7 +1708,7 @@
           pollDatabaseState();
         }
       } catch (err) {
-        triggerToast(err.message || "Failed to delete driver", true);
+        triggerToast(describeApiError(err, 'delete_driver_api.php'), true);
       }
     }
 
@@ -1712,7 +1726,7 @@
           pollDatabaseState();
         }
       } catch (err) {
-        triggerToast(err.message || "Failed to delete task", true);
+        triggerToast(describeApiError(err, 'delete_task_api.php'), true);
       }
     }
 
