@@ -8,7 +8,7 @@ require_once __DIR__ . '/../database_configuration.php';
 
 try {
     // 1. Query drivers list
-    $drv_stmt = $pdo->prepare("SELECT id, name, status, avatar FROM drivers");
+    $drv_stmt = $pdo->prepare("SELECT id, name, phone, status, avatar FROM drivers");
     $drv_stmt->execute();
     $drivers = $drv_stmt->fetchAll();
 

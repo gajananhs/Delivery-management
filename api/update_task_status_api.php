@@ -30,20 +30,38 @@ try {
         ':task_id' => $taskId
     ]);
 
-    // 2. Fetch driver & vehicle linked to release them if completed
+    // 2. Fetch driver & vehicle linked to release them if completed.
+    // A driver can now hold several tasks at once (Pending/In Progress/Not
+    // Completed elsewhere), so only flip them back to 'Available' once THIS
+    // was their last non-completed task - otherwise completing task A would
+    // wrongly mark the driver free while task B is still assigned to them.
     if ($status === 'completed') {
         $metaStmt = $pdo->prepare("SELECT driver_id, vehicle_id FROM tasks WHERE id = :task_id");
         $metaStmt->execute([':task_id' => $taskId]);
         $task = $metaStmt->fetch();
 
         if ($task) {
-            // Release Driver
-            $relDrv = $pdo->prepare("UPDATE drivers SET status = 'Available' WHERE id = :driver_id");
-            $relDrv->execute([':driver_id' => $task['driver_id']]);
+            // Release Driver only if no other active task still holds them
+            $drvRemaining = $pdo->prepare("
+                SELECT COUNT(*) FROM tasks
+                WHERE driver_id = :driver_id AND status IN ('assigned', 'in_transit') AND id != :task_id
+            ");
+            $drvRemaining->execute([':driver_id' => $task['driver_id'], ':task_id' => $taskId]);
+            if ((int)$drvRemaining->fetchColumn() === 0) {
+                $relDrv = $pdo->prepare("UPDATE drivers SET status = 'Available' WHERE id = :driver_id");
+                $relDrv->execute([':driver_id' => $task['driver_id']]);
+            }
 
-            // Release Vehicle
-            $relVeh = $pdo->prepare("UPDATE vehicles SET status = 'Available' WHERE id = :vehicle_id");
-            $relVeh->execute([':vehicle_id' => $task['vehicle_id']]);
+            // Release Vehicle only if no other active task still uses it
+            $vehRemaining = $pdo->prepare("
+                SELECT COUNT(*) FROM tasks
+                WHERE vehicle_id = :vehicle_id AND status IN ('assigned', 'in_transit') AND id != :task_id
+            ");
+            $vehRemaining->execute([':vehicle_id' => $task['vehicle_id'], ':task_id' => $taskId]);
+            if ((int)$vehRemaining->fetchColumn() === 0) {
+                $relVeh = $pdo->prepare("UPDATE vehicles SET status = 'Available' WHERE id = :vehicle_id");
+                $relVeh->execute([':vehicle_id' => $task['vehicle_id']]);
+            }
         }
     }
 

@@ -348,11 +348,13 @@
                 <span id="driver-profile-avatar-fallback">DL</span>
               </div>
               <div>
-                <!-- Simulated Driver Dropdown Selection to solve filter mismatch issues -->
-                <select id="driver-profile-selector" class="bg-slate-800 text-white text-xs font-bold border-none outline-none rounded p-1 max-w-[150px] cursor-pointer focus:ring-1 focus:ring-indigo-500"></select>
+                <div id="driver-profile-name" class="text-xs font-bold text-white"></div>
                 <div id="driver-profile-phone" class="text-[10px] text-slate-400 font-semibold mt-0.5"></div>
-                <div class="text-[10px] text-emerald-400 font-semibold mt-0.5 flex items-center">
-                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-ping"></span> On Duty
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-[10px] text-emerald-400 font-semibold flex items-center">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-ping"></span> On Duty
+                  </span>
+                  <button id="driver-switch-link" type="button" class="text-[9px] text-slate-400 underline hover:text-slate-200">Switch driver</button>
                 </div>
               </div>
             </div>
@@ -476,6 +478,28 @@
         </div>
       </div>
 
+      <!-- Driver Identity Picker: shown once per device (or on explicit
+           "Switch driver") so a phone is locked to exactly one driver and
+           can never casually browse another driver's tasks/PIN. -->
+      <div id="driver-identity-overlay" class="absolute inset-0 bg-slate-900/90 z-50 flex items-end justify-center p-0 hidden">
+        <div class="bg-white w-full rounded-t-3xl p-6 pb-10 shadow-2xl max-h-[80%] flex flex-col">
+          <h3 class="text-lg font-bold text-slate-800 mb-1">Who's using this phone?</h3>
+          <p class="text-xs text-slate-500 mb-4">Pick your driver profile. This device will stay signed in as you.</p>
+          <div id="driver-identity-list" class="space-y-2 overflow-y-auto"></div>
+        </div>
+      </div>
+
+      <!-- Shared confirmation modal: Cancel / Delete (or other destructive action) -->
+      <div id="confirm-modal-overlay" class="absolute inset-0 bg-slate-900/85 z-50 flex items-center justify-center p-6 hidden">
+        <div class="bg-white w-full max-w-xs rounded-2xl p-5 shadow-2xl">
+          <p id="confirm-modal-message" class="text-sm font-semibold text-slate-800 mb-5"></p>
+          <div class="flex gap-3">
+            <button id="confirm-modal-cancel-btn" type="button" class="flex-1 py-2.5 text-xs font-bold text-slate-600 bg-slate-100 rounded-xl">Cancel</button>
+            <button id="confirm-modal-confirm-btn" type="button" class="flex-1 py-2.5 text-xs font-bold text-white bg-red-600 rounded-xl">Delete</button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -492,7 +516,6 @@
 
     // --- Global Application State Container ---
     const state = {
-      isDemoMode: false,            // Defaults to false, turns true automatically on API/DB failure
       currentRole: 'employee',      // 'employee' | 'driver'
       activeEmployeeTab: 'assign',  // 'assign' | 'register' | 'monitor'
       activeDriverTab: 'tasks',     // 'tasks' | 'map' | 'fuel'
@@ -502,76 +525,111 @@
       suppliers: [],                // Imported/registered from canaresai.com Supplier Master
       customers: [],                // Saved customers/companies for the dispatch form
       items: [],                    // Item master list (what's collected/supplied on runs)
-      demoOtps: {},                 // Offline mirror of driver_daily_otp: `${driverId}|${date}` -> pincode
       notifiedTaskIds: [],          // Task ids we've already beeped/notified the driver about
-      currentDriverId: '',          // Dynamically matches active simulated driver profile
+      currentDriverId: '',          // The one driver identity this device is locked to (see below)
+      editingDriverId: null,        // Driver currently in inline-edit mode in Live Register
+      pendingConfirm: null,         // { message, onConfirm } for the shared confirmation modal
       activeNavigationTask: null,   // Currently navigated route
       unlockedAddresses: {}         // Stores decrypted addresses indexable by task_id
     };
 
-    // --- State Persistence Manager (Saves state during code reloads or sandboxed refreshes) ---
-    function loadSavedState() {
-      if (state.isDemoMode) {
-        try {
-          const saved = localStorage.getItem('canares_dispatch_demo_state');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            state.tasks = parsed.tasks || [];
-            state.drivers = parsed.drivers || [];
-            state.vehicles = parsed.vehicles || [];
-            state.suppliers = parsed.suppliers || [];
-            state.customers = parsed.customers || [];
-            state.items = parsed.items || [];
-            state.demoOtps = parsed.demoOtps || {};
-            state.notifiedTaskIds = parsed.notifiedTaskIds || [];
-            state.unlockedAddresses = parsed.unlockedAddresses || {};
-            state.currentDriverId = parsed.currentDriverId || '';
-          }
-        } catch (e) {
-          console.warn("Could not retrieve local state persistence logs:", e);
-        }
+    // --- Driver Device Identity ---
+    // Each phone/device is meant to belong to exactly one driver. We store
+    // that choice in localStorage so it survives reloads, and never let it
+    // be casually swapped mid-session - only through an explicit, confirmed
+    // "Switch driver" action (see initDriverIdentity below). This is what
+    // keeps one driver from ever seeing another driver's tasks or PIN.
+    const DRIVER_IDENTITY_KEY = 'canares_driver_identity';
+
+    function loadDriverIdentity() {
+      try {
+        return localStorage.getItem(DRIVER_IDENTITY_KEY) || '';
+      } catch (e) {
+        return '';
       }
     }
 
-    function saveState() {
-      if (state.isDemoMode) {
-        try {
-          localStorage.setItem('canares_dispatch_demo_state', JSON.stringify({
-            tasks: state.tasks,
-            drivers: state.drivers,
-            vehicles: state.vehicles,
-            suppliers: state.suppliers,
-            customers: state.customers,
-            items: state.items,
-            demoOtps: state.demoOtps,
-            notifiedTaskIds: state.notifiedTaskIds,
-            unlockedAddresses: state.unlockedAddresses,
-            currentDriverId: state.currentDriverId
-          }));
-        } catch (e) {
-          console.error("State saving error:", e);
-        }
+    function saveDriverIdentity(driverId) {
+      try {
+        localStorage.setItem(DRIVER_IDENTITY_KEY, driverId);
+      } catch (e) {
+        console.error("Could not persist driver identity:", e);
       }
     }
 
-    // --- One-Click Test Seed (Prevents frustrating manual registry setups!) ---
-    window.seedDemoFleet = function() {
-      state.drivers = [
-        { id: 'alex', name: 'Alex Carter', status: 'Available', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Alex&backgroundColor=transparent' },
-        { id: 'jane', name: 'Jane Doe', status: 'Available', avatar: 'https://api.dicebear.com/7.x/avataaars/svg?seed=Jane&backgroundColor=transparent' }
-      ];
-      state.vehicles = [
-        { id: 'V-3456', plate: 'MH-12-AB-3456', model: 'Transit Cargo Van', status: 'Available', fuel: 82 },
-        { id: 'V-9876', plate: 'MH-12-XY-9876', model: 'Sprinter Delivery L2', status: 'Available', fuel: 65 }
-      ];
-      state.tasks = [];
-      state.unlockedAddresses = {};
-      state.currentDriverId = 'alex';
-      
-      saveState();
+    function clearDriverIdentity() {
+      try {
+        localStorage.removeItem(DRIVER_IDENTITY_KEY);
+      } catch (e) {}
+    }
+
+    // Called once on load, and again any time the driver list changes -
+    // picks up a previously-saved identity, or opens the picker if none is
+    // saved yet (or the saved driver no longer exists, e.g. was deleted).
+    function initDriverIdentity() {
+      const saved = loadDriverIdentity();
+      if (saved) {
+        state.currentDriverId = saved;
+      }
+      document.getElementById('driver-switch-link').addEventListener('click', () => {
+        showConfirm('Switch to a different driver profile on this device?', () => openDriverIdentityPicker());
+      });
+    }
+
+    // Opens the picker if the role is currently 'driver' and there's no
+    // valid stored identity for it yet.
+    function ensureDriverIdentity() {
+      const stillValid = state.currentDriverId && state.drivers.some(d => d.id === state.currentDriverId);
+      if (!stillValid) {
+        openDriverIdentityPicker();
+      }
+    }
+
+    function openDriverIdentityPicker() {
+      const overlay = document.getElementById('driver-identity-overlay');
+      const list = document.getElementById('driver-identity-list');
+      if (state.drivers.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 font-semibold text-center py-4">No drivers registered yet. Ask dispatch to register you on the Live Register tab.</p>`;
+      } else {
+        list.innerHTML = state.drivers.map(d => `
+          <button type="button" onclick="selectDriverIdentity('${d.id}')" class="w-full flex items-center gap-3 bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 rounded-xl p-3 text-left transition-colors">
+            <img src="${d.avatar}" class="w-9 h-9 rounded-full bg-slate-100" alt="Avatar">
+            <div class="min-w-0">
+              <div class="font-bold text-slate-800 text-sm truncate">${d.name}</div>
+              <div class="text-[10px] text-slate-400 truncate">${d.phone || d.id.toUpperCase()}</div>
+            </div>
+          </button>
+        `).join('');
+      }
+      overlay.classList.remove('hidden');
+    }
+
+    window.selectDriverIdentity = function(driverId) {
+      state.currentDriverId = driverId;
+      saveDriverIdentity(driverId);
+      document.getElementById('driver-identity-overlay').classList.add('hidden');
       updateDOMControllers();
-      triggerToast("Mock Preview Fleet successfully seeded!");
     };
+
+    // --- Shared confirmation modal (Cancel / Delete) ---
+    function showConfirm(message, onConfirm) {
+      state.pendingConfirm = onConfirm;
+      document.getElementById('confirm-modal-message').textContent = message;
+      document.getElementById('confirm-modal-overlay').classList.remove('hidden');
+    }
+
+    function initConfirmModal() {
+      document.getElementById('confirm-modal-cancel-btn').addEventListener('click', () => {
+        state.pendingConfirm = null;
+        document.getElementById('confirm-modal-overlay').classList.add('hidden');
+      });
+      document.getElementById('confirm-modal-confirm-btn').addEventListener('click', () => {
+        const action = state.pendingConfirm;
+        state.pendingConfirm = null;
+        document.getElementById('confirm-modal-overlay').classList.add('hidden');
+        if (action) action();
+      });
+    }
 
     // --- DOM Initializers ---
     document.addEventListener('DOMContentLoaded', () => {
@@ -580,7 +638,8 @@
       initFormTypeSelectors();
       initFormSubmitHandlers();
       initCollapsibleForms();
-      initDriverSelectorListener();
+      initDriverIdentity();
+      initConfirmModal();
       initDeliveryStops();
 
       // Trigger initial state sync
@@ -738,6 +797,7 @@
         empBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white";
         drvView.classList.remove('hidden');
         empView.classList.add('hidden');
+        ensureDriverIdentity();
         renderActiveRoleView();
         // Ask for browser notification permission once, so a new task
         // assignment can show a real OS-level notification + beep.
@@ -822,17 +882,6 @@
       });
     }
 
-    // --- Active Sim Driver Toggle Switch listener ---
-    function initDriverSelectorListener() {
-      const selector = document.getElementById('driver-profile-selector');
-      selector.addEventListener('change', (e) => {
-        state.currentDriverId = e.target.value;
-        saveState();
-        updateDOMControllers();
-        triggerToast(`Switched active smartphone screen to Driver: ${selector.options[selector.selectedIndex].text}`);
-      });
-    }
-
     // --- API Form Submit Triggers ---
     function initFormSubmitHandlers() {
       // 1. Register Real Driver
@@ -844,26 +893,6 @@
           name: form.name.value.trim(),
           phone: form.phone.value.trim()
         };
-
-        if (state.isDemoMode) {
-          const newDriver = {
-            id: payload.id,
-            name: payload.name,
-            phone: payload.phone,
-            status: 'Available',
-            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.id}&backgroundColor=transparent`
-          };
-          state.drivers.push(newDriver);
-          if (!state.currentDriverId) {
-            state.currentDriverId = payload.id;
-          }
-          saveState();
-          triggerToast(`Driver "${payload.name}" registered locally!`);
-          form.reset();
-          document.getElementById('btn-toggle-add-driver').click();
-          updateDOMControllers();
-          return;
-        }
 
         try {
           const res = await fetchApi('api/add_driver_api.php', 'POST', payload);
@@ -889,23 +918,6 @@
           fuel: parseInt(form.fuel.value) || 100
         };
 
-        if (state.isDemoMode) {
-          const newVeh = {
-            id: payload.id,
-            plate: payload.plate,
-            model: payload.model,
-            status: 'Available',
-            fuel: payload.fuel
-          };
-          state.vehicles.push(newVeh);
-          saveState();
-          triggerToast(`Vehicle "${payload.plate}" registered locally!`);
-          form.reset();
-          document.getElementById('btn-toggle-add-vehicle').click();
-          updateDOMControllers();
-          return;
-        }
-
         try {
           const res = await fetchApi('api/add_vehicle_api.php', 'POST', payload);
           if (res.status === 'success') {
@@ -928,16 +940,6 @@
           phone: form.phone.value.trim(),
           city: form.city.value.trim()
         };
-
-        if (state.isDemoMode) {
-          state.customers.push({ id: `CUST-${Math.floor(1000 + Math.random()*9000)}`, ...payload });
-          saveState();
-          triggerToast(`Customer "${payload.name}" added locally!`);
-          form.reset();
-          document.getElementById('btn-toggle-add-customer').click();
-          updateDOMControllers();
-          return;
-        }
 
         try {
           const res = await fetchApi('api/add_customer_api.php', 'POST', payload);
@@ -963,16 +965,6 @@
           city: form.city.value.trim()
         };
 
-        if (state.isDemoMode) {
-          state.suppliers.push({ code: payload.code, name: payload.name, phone: payload.phone, city: payload.city, status: 'active' });
-          saveState();
-          triggerToast(`Supplier "${payload.name}" added locally!`);
-          form.reset();
-          document.getElementById('btn-toggle-add-supplier').click();
-          updateDOMControllers();
-          return;
-        }
-
         try {
           const res = await fetchApi('api/add_supplier_api.php', 'POST', payload);
           if (res.status === 'success') {
@@ -995,17 +987,6 @@
           code: form.code.value.trim().toUpperCase(),
           unit: form.unit.value.trim()
         };
-
-        if (state.isDemoMode) {
-          const code = payload.code || `ITM-${Math.floor(1000 + Math.random()*9000)}`;
-          state.items.push({ code, name: payload.name, unit: payload.unit, status: 'active' });
-          saveState();
-          triggerToast(`Item "${payload.name}" added locally!`);
-          form.reset();
-          document.getElementById('btn-toggle-add-item').click();
-          updateDOMControllers();
-          return;
-        }
 
         try {
           const res = await fetchApi('api/add_item_api.php', 'POST', payload);
@@ -1054,62 +1035,6 @@
         const batchId = stops.length > 1 ? `BATCH-${Math.floor(1000 + Math.random()*9000)}` : null;
         const pincodes = [];
 
-        if (state.isDemoMode) {
-          const targetDriver = state.drivers.find(d => d.id === driverId);
-          const distance = `${(Math.random() * 8 + 1).toFixed(1)} km`;
-          const eta = `${Math.floor(Math.random() * 30 + 10)} mins`;
-
-          // Mirrors the real backend's driver_daily_otp table locally: one
-          // pincode per driver per calendar date, reused across every task
-          // assigned to them today instead of a fresh one per task.
-          const today = new Date().toISOString().slice(0, 10);
-          const otpKey = `${driverId}|${today}`;
-          if (!state.demoOtps[otpKey]) {
-            state.demoOtps[otpKey] = Math.floor(1000 + Math.random()*9000).toString();
-          }
-          const dailyPincode = state.demoOtps[otpKey];
-
-          stops.forEach(stop => {
-            const mockTaskId = `TSK-${Math.floor(1000 + Math.random()*9000)}`;
-            const targetSupplier = state.suppliers.find(s => s.code === stop.supplier_code);
-            pincodes.push(dailyPincode);
-
-            state.tasks.unshift({
-              id: mockTaskId,
-              batch_id: batchId,
-              type: stop.type,
-              customer: stop.customer,
-              customer_phone: stop.customer_phone,
-              area: stop.area,
-              exact_address: stop.exact_address,
-              supplier_code: stop.supplier_code || '',
-              supplier_name: targetSupplier ? targetSupplier.name : '',
-              supplier_phone: targetSupplier ? targetSupplier.phone : '',
-              items: stop.items || [],
-              pincode: dailyPincode,
-              status: 'assigned',
-              driver_id: driverId,
-              driver_name: targetDriver ? targetDriver.name : 'Unknown',
-              driver_phone: targetDriver ? targetDriver.phone : '',
-              vehicle_id: vehicleId,
-              distance,
-              eta
-            });
-          });
-
-          // Lock driver and vehicle
-          state.drivers = state.drivers.map(d => d.id === driverId ? { ...d, status: 'Busy' } : d);
-          state.vehicles = state.vehicles.map(v => v.id === vehicleId ? { ...v, status: 'In Use' } : v);
-
-          saveState();
-          triggerToast(stops.length > 1
-            ? `${stops.length} deliveries dispatched to the same driver! PINs: ${pincodes.join(', ')}`
-            : `Directly Assigned! Secure Code PIN: ${pincodes[0]}`);
-          resetDispatchForm(form);
-          updateDOMControllers();
-          return;
-        }
-
         try {
           for (const stop of stops) {
             const addRes = await fetchApi('api/add_new_task_api.php', 'POST', { ...stop, batch_id: batchId });
@@ -1136,21 +1061,6 @@
         const taskId = document.getElementById('pincode-task-id').value;
         const pincode = e.target.pincode.value;
 
-        if (state.isDemoMode) {
-          const matchedTask = state.tasks.find(t => t.id === taskId);
-          if (matchedTask && matchedTask.pincode === pincode) {
-            state.unlockedAddresses[taskId] = matchedTask.exact_address;
-            saveState();
-            document.getElementById('pin-modal-overlay').classList.add('hidden');
-            e.target.reset();
-            triggerToast("Address decrypted successfully.");
-            updateDOMControllers();
-          } else {
-            triggerToast("Incorrect PIN code", true);
-          }
-          return;
-        }
-
         try {
           const res = await fetchApi('api/verify_pin_api.php', 'POST', { task_id: taskId, pincode });
           if (res.status === 'success') {
@@ -1175,15 +1085,6 @@
         const driverActiveVehicle = getDriverActiveVehicle(state.currentDriverId);
         if (!driverActiveVehicle) {
           triggerToast("No active vehicle detected", true);
-          return;
-        }
-
-        if (state.isDemoMode) {
-          state.vehicles = state.vehicles.map(v => v.id === driverActiveVehicle.id ? { ...v, fuel: 100 } : v);
-          saveState();
-          triggerToast("Fuel Voucher Approved!");
-          e.target.reset();
-          updateDOMControllers();
           return;
         }
 
@@ -1218,11 +1119,13 @@
       }
 
       const response = await fetch(fullUrl, options);
-      if (!response.ok) {
+      let data;
+      try {
+        data = await response.json();
+      } catch (e) {
         throw new Error('Server returned error status');
       }
-      const data = await response.json();
-      if (data.status === 'error') {
+      if (!response.ok || data.status === 'error') {
         throw new Error(data.message || 'API Error');
       }
       return data;
@@ -1240,7 +1143,6 @@
           fetchApi('api/get_items_api.php')
         ]);
 
-        state.isDemoMode = false;
         state.tasks = tasksRes.data;
         state.drivers = fleetRes.data.drivers;
         state.vehicles = fleetRes.data.vehicles;
@@ -1258,21 +1160,19 @@
 
         updateDOMControllers();
       } catch (err) {
-        console.warn("Database offline. Utilizing persistent localStorage simulator sandbox.");
-        
-        // Enter Sandbox offline mode
-        state.isDemoMode = true;
-        loadSavedState();
+        console.warn("Database unreachable, will retry.", err);
 
-        // Render demo warning badge
+        // No offline fallback - this app is a live front-end onto the
+        // Hostinger database, so we just show that it's unreachable and
+        // keep retrying instead of fabricating local data.
         const badge = document.getElementById('db-status-badge');
-        badge.className = "bg-amber-600 text-white px-2.5 py-1 rounded-full text-xs font-bold";
-        badge.textContent = "Sandbox (Offline Mode)";
+        badge.className = "bg-red-600 text-white px-2.5 py-1 rounded-full text-xs font-bold";
+        badge.textContent = "Database Offline — Retrying…";
 
         const liveP = document.getElementById('live-status-p');
-        if (liveP) liveP.textContent = "Register Drivers/Vehicles on 'Live Register' tab to begin dispatching.";
+        if (liveP) liveP.textContent = "Could not reach the live database. Retrying shortly…";
 
-        updateDOMControllers();
+        setTimeout(pollDatabaseState, 8000);
       }
     }
 
@@ -1335,7 +1235,6 @@
         }
         state.notifiedTaskIds.push(t.id);
       });
-      saveState();
     }
 
     function populateDropdownSelectors() {
@@ -1398,24 +1297,41 @@
         drvContainer.innerHTML = `
           <div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl">
             <p class="text-xs text-slate-400 font-semibold">No active drivers registered.</p>
-            <button onclick="seedDemoFleet()" class="mt-2.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-[10px] font-bold rounded-lg transition-all">
-              ⚡ Seed Demo Fleet Sandbox
-            </button>
           </div>
         `;
       } else {
-        drvContainer.innerHTML = state.drivers.map(d => `
+        drvContainer.innerHTML = state.drivers.map(d => {
+          if (state.editingDriverId === d.id) {
+            return `
+              <div class="bg-white p-3 rounded-xl border border-indigo-200 shadow-sm space-y-2">
+                <div class="grid grid-cols-2 gap-2">
+                  <input type="text" class="edit-driver-name bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500" value="${d.name}" placeholder="Full name">
+                  <input type="tel" class="edit-driver-phone bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500" value="${d.phone || ''}" placeholder="Phone number">
+                </div>
+                <div class="flex gap-2">
+                  <button onclick="saveDriverEdit('${d.id}')" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white py-1.5 rounded-lg font-bold text-[11px]">Save</button>
+                  <button onclick="cancelDriverEdit()" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 py-1.5 rounded-lg font-bold text-[11px]">Cancel</button>
+                </div>
+              </div>
+            `;
+          }
+          return `
           <div class="bg-white p-3 rounded-xl border border-slate-100 flex items-center justify-between shadow-sm">
-            <div class="flex items-center space-x-3">
-              <img src="${d.avatar}" class="w-8 h-8 rounded-full bg-slate-100" alt="Avatar">
-              <div>
-                <div class="font-bold text-slate-800 text-sm">${d.name}</div>
-                <div class="text-[10px] text-slate-400">ID: ${d.id.toUpperCase()}${d.phone ? ` • ${d.phone}` : ''}</div>
+            <div class="flex items-center space-x-3 min-w-0">
+              <img src="${d.avatar}" class="w-8 h-8 rounded-full bg-slate-100 shrink-0" alt="Avatar">
+              <div class="min-w-0">
+                <div class="font-bold text-slate-800 text-sm truncate">${d.name}</div>
+                <div class="text-[10px] text-slate-400 truncate">ID: ${d.id.toUpperCase()}${d.phone ? ` • ${d.phone}` : ''}</div>
               </div>
             </div>
-            <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${d.status}</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${d.status}</span>
+              <button onclick="startDriverEdit('${d.id}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-indigo-100 text-slate-500 hover:text-indigo-600 text-[11px]" title="Edit driver">✎</button>
+              <button onclick="confirmDeleteDriver('${d.id}', '${d.name.replace(/'/g, "\\'")}')" class="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-red-100 text-slate-500 hover:text-red-600 text-[11px]" title="Delete driver">✕</button>
+            </div>
           </div>
-        `).join('');
+        `;
+        }).join('');
       }
 
       if (state.vehicles.length === 0) {
@@ -1550,6 +1466,9 @@
           ${(t.status === 'assigned' || t.status === 'in_transit') && t.driver_id
             ? `<a href="track_driver.html?driver=${encodeURIComponent(t.driver_id)}" target="_blank" class="block text-center text-[11px] font-bold text-indigo-600 hover:text-indigo-700 pt-1">📍 Track live GPS location</a>`
             : ''}
+          ${t.status === 'completed'
+            ? `<button onclick="confirmDeleteTask('${t.id}', '${t.id} — ${(t.customer || '').replace(/'/g, "\\'")}')" class="w-full bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl text-[11px] font-bold">Delete Task</button>`
+            : ''}
         </div>
       `).join('');
     }
@@ -1570,30 +1489,29 @@
     }
 
     function renderDriverProfile() {
-      const profileSelector = document.getElementById('driver-profile-selector');
-      if (!profileSelector) return;
+      const nameEl = document.getElementById('driver-profile-name');
+      if (!nameEl) return;
 
-      if (state.drivers.length === 0) {
-        profileSelector.innerHTML = `<option value="">No Active Drivers</option>`;
+      const driverObj = state.drivers.find(d => d.id === state.currentDriverId);
+
+      if (!driverObj) {
+        nameEl.textContent = 'No profile selected';
+        const phoneEl = document.getElementById('driver-profile-phone');
+        if (phoneEl) phoneEl.textContent = '';
         const fallback = document.getElementById('driver-profile-avatar-fallback');
-        if (fallback) fallback.textContent = "?";
+        if (fallback) { fallback.textContent = '?'; fallback.style.display = 'block'; }
+        const profileAvatar = document.getElementById('driver-profile-avatar');
+        if (profileAvatar) profileAvatar.style.display = 'none';
+        // Self-heals if this device's saved driver was deleted, or none was
+        // ever picked - only pops the picker while actually on the driver tab.
+        if (state.currentRole === 'driver') ensureDriverIdentity();
         return;
       }
 
-      // Populate interactive selector options
-      profileSelector.innerHTML = state.drivers.map(d => `
-        <option value="${d.id}" ${d.id === state.currentDriverId ? 'selected' : ''}>${d.name}</option>
-      `).join('');
-
-      const driverObj = state.drivers.find(d => d.id === state.currentDriverId) || state.drivers[0];
-      if (!driverObj) return;
+      nameEl.textContent = driverObj.name;
 
       const phoneEl = document.getElementById('driver-profile-phone');
       if (phoneEl) phoneEl.textContent = driverObj.phone || '';
-
-      if (state.currentDriverId !== driverObj.id) {
-        state.currentDriverId = driverObj.id;
-      }
 
       const profileAvatar = document.getElementById('driver-profile-avatar');
       const fallback = document.getElementById('driver-profile-avatar-fallback');
@@ -1625,7 +1543,9 @@
       const container = document.getElementById('driver-tasks-container');
       if (!container) return;
 
-      const activeDriverObj = state.drivers.find(d => d.id === state.currentDriverId) || state.drivers[0];
+      // Never fall back to "any driver" - only show tasks for the identity
+      // this device is actually locked to.
+      const activeDriverObj = state.drivers.find(d => d.id === state.currentDriverId);
       if (!activeDriverObj) {
         container.innerHTML = `
           <div class="p-8 text-center bg-white border border-slate-100 rounded-2xl shadow-sm text-xs text-slate-400 font-semibold">
@@ -1750,6 +1670,80 @@
       }).join('');
     }
 
+    // --- Driver Edit / Delete (Live Register) ---
+    window.startDriverEdit = function(driverId) {
+      state.editingDriverId = driverId;
+      renderLiveRegister();
+    };
+
+    window.cancelDriverEdit = function() {
+      state.editingDriverId = null;
+      renderLiveRegister();
+    };
+
+    window.saveDriverEdit = async function(driverId) {
+      const nameInput = document.querySelector('.edit-driver-name');
+      const phoneInput = document.querySelector('.edit-driver-phone');
+      const name = nameInput.value.trim();
+      const phone = phoneInput.value.trim();
+
+      if (!name) {
+        triggerToast("Driver name can't be empty", true);
+        return;
+      }
+
+      try {
+        const res = await fetchApi('api/update_driver_api.php', 'POST', { id: driverId, name, phone });
+        if (res.status === 'success') {
+          triggerToast(`Driver "${name}" updated!`);
+          state.editingDriverId = null;
+          pollDatabaseState();
+        }
+      } catch (err) {
+        triggerToast("Failed to update driver", true);
+      }
+    };
+
+    window.confirmDeleteDriver = function(driverId, driverName) {
+      showConfirm(`Delete driver "${driverName}"? This can't be undone.`, () => deleteDriver(driverId));
+    };
+
+    async function deleteDriver(driverId) {
+      try {
+        const res = await fetchApi('api/delete_driver_api.php', 'POST', { id: driverId });
+        if (res.status === 'success') {
+          triggerToast("Driver deleted.");
+          // If this device was locked to the deleted driver, clear that
+          // identity so the picker reopens instead of pointing at nothing.
+          if (state.currentDriverId === driverId) {
+            clearDriverIdentity();
+            state.currentDriverId = '';
+          }
+          pollDatabaseState();
+        }
+      } catch (err) {
+        triggerToast(err.message || "Failed to delete driver", true);
+      }
+    }
+
+    // --- Task Delete (Fleet Activity - only once completed, by the
+    // office/dispatch role that assigned it) ---
+    window.confirmDeleteTask = function(taskId, taskLabel) {
+      showConfirm(`Delete completed task "${taskLabel}"? This can't be undone.`, () => deleteTask(taskId));
+    };
+
+    async function deleteTask(taskId) {
+      try {
+        const res = await fetchApi('api/delete_task_api.php', 'POST', { task_id: taskId });
+        if (res.status === 'success') {
+          triggerToast("Task deleted.");
+          pollDatabaseState();
+        }
+      } catch (err) {
+        triggerToast(err.message || "Failed to delete task", true);
+      }
+    }
+
     // --- Interface Overlay Openers ---
     window.openUnlockModal = function(taskId) {
       document.getElementById('pincode-task-id').value = taskId;
@@ -1766,7 +1760,6 @@
       if (!('geolocation' in navigator) || gpsWatchId !== null) return;
       gpsWatchId = navigator.geolocation.watchPosition(
         (pos) => {
-          if (state.isDemoMode) return; // nothing to persist this to yet
           fetchApi('api/update_driver_location_api.php', 'POST', {
             driver_id: driverId,
             lat: pos.coords.latitude,
@@ -1788,16 +1781,6 @@
     window.engageNavigation = async function(taskId) {
       startRealGpsReporting(state.currentDriverId);
 
-      if (state.isDemoMode) {
-        state.tasks = state.tasks.map(t => t.id === taskId ? { ...t, status: 'in_transit' } : t);
-        const activeTask = state.tasks.find(t => t.id === taskId);
-        state.activeNavigationTask = activeTask;
-        saveState();
-        switchToMapTab();
-        updateDOMControllers();
-        return;
-      }
-
       try {
         const res = await fetchApi('api/update_task_status_api.php', 'POST', { task_id: taskId, status: 'in_transit' });
         if (res.status === 'success') {
@@ -1818,35 +1801,6 @@
     window.completeCurrentRoute = async function(taskId) {
       stopRealGpsReporting();
 
-      if (state.isDemoMode) {
-        const completedTask = state.tasks.find(t => t.id === taskId);
-        state.tasks = state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t);
-
-        // Release Driver & Vehicle only if this was their last non-completed
-        // task - a driver/vehicle can hold several tasks at once now, so
-        // completing one shouldn't free them while another is still active.
-        if (completedTask) {
-          const driverStillBusy = state.tasks.some(t =>
-            t.driver_id === completedTask.driver_id && (t.status === 'assigned' || t.status === 'in_transit'));
-          if (!driverStillBusy) {
-            state.drivers = state.drivers.map(d => d.id === completedTask.driver_id ? { ...d, status: 'Available' } : d);
-          }
-
-          const vehicleStillBusy = state.tasks.some(t =>
-            t.vehicle_id === completedTask.vehicle_id && (t.status === 'assigned' || t.status === 'in_transit'));
-          if (!vehicleStillBusy) {
-            state.vehicles = state.vehicles.map(v => v.id === completedTask.vehicle_id ? { ...v, status: 'Available' } : v);
-          }
-        }
-
-        saveState();
-        triggerToast("Route Complete! Fleet released to available.");
-        state.activeNavigationTask = null;
-        document.getElementById('nav-btn-tasks').click();
-        updateDOMControllers();
-        return;
-      }
-
       try {
         const res = await fetchApi('api/update_task_status_api.php', 'POST', { task_id: taskId, status: 'completed' });
         if (res.status === 'success') {
@@ -1863,7 +1817,7 @@
     // --- Telemetry Simulation engine ---
     let gpsInterval = null;
     function renderMapTelemetry() {
-      const activeDriverObj = state.drivers.find(d => d.id === state.currentDriverId) || state.drivers[0];
+      const activeDriverObj = state.drivers.find(d => d.id === state.currentDriverId);
       if (!activeDriverObj) return;
 
       const activeTask = state.tasks.find(t => t.driver_id === activeDriverObj.id && t.status === 'in_transit');

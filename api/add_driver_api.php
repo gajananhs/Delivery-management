@@ -24,6 +24,7 @@ try {
 
     $id = strtolower(trim($input['id']));
     $name = trim($input['name']);
+    $phone = trim($input['phone'] ?? '');
     $avatar = "https://api.dicebear.com/7.x/avataaars/svg?seed=" . urlencode($id) . "&backgroundColor=transparent";
 
     $existing = $pdo->prepare("SELECT id FROM drivers WHERE id = :id");
@@ -35,15 +36,15 @@ try {
     }
 
     $stmt = $pdo->prepare("
-        INSERT INTO drivers (id, name, status, avatar)
-        VALUES (:id, :name, 'Available', :avatar)
+        INSERT INTO drivers (id, name, phone, status, avatar)
+        VALUES (:id, :name, :phone, 'Available', :avatar)
     ");
-    $stmt->execute([':id' => $id, ':name' => $name, ':avatar' => $avatar]);
+    $stmt->execute([':id' => $id, ':name' => $name, ':phone' => $phone, ':avatar' => $avatar]);
 
     echo json_encode([
         "status" => "success",
         "message" => "Driver registered",
-        "data" => ["id" => $id, "name" => $name, "status" => "Available", "avatar" => $avatar],
+        "data" => ["id" => $id, "name" => $name, "phone" => $phone, "status" => "Available", "avatar" => $avatar],
     ]);
 } catch (PDOException $e) {
     http_response_code(500);
