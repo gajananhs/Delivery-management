@@ -152,6 +152,10 @@
                 </div>
                 <input type="text" class="stop-customer w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-indigo-500" list="customer-datalist" required placeholder="e.g. Stark Industries">
               </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">Customer Phone Number</label>
+                <input type="tel" class="stop-customer-phone w-full bg-white border border-slate-200 rounded-xl p-2.5 text-sm outline-none focus:border-indigo-500" required placeholder="e.g. 9876543210">
+              </div>
               <div class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">General Area</label>
@@ -178,8 +182,30 @@
                   <option value="">— No supplier linked —</option>
                 </select>
               </div>
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <label class="block text-xs font-bold text-slate-500 uppercase tracking-wider">Items to Collect / Supply</label>
+                  <button type="button" class="add-item-row-btn text-[10px] font-bold text-indigo-600 hover:text-indigo-700 uppercase tracking-wider flex items-center gap-1">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                    Add Item
+                  </button>
+                </div>
+                <div class="stop-items-container space-y-2"></div>
+              </div>
             </div>
           </template>
+
+          <!-- Hidden template for one item row (name/qty/unit) - cloned into
+               each delivery stop's .stop-items-container -->
+          <template id="item-row-template">
+            <div class="item-row flex items-center gap-1.5">
+              <input type="text" class="item-row-name flex-1 min-w-0 bg-white border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500" list="items-datalist" placeholder="Item name">
+              <input type="number" class="item-row-qty w-14 bg-white border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500" min="0" step="0.01" value="1" placeholder="Qty">
+              <input type="text" class="item-row-unit w-16 bg-white border border-slate-200 rounded-lg p-2 text-xs outline-none focus:border-indigo-500" placeholder="Unit">
+              <button type="button" class="remove-item-row-btn w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 text-slate-500 hover:bg-red-100 hover:text-red-600 text-[11px] font-bold shrink-0" title="Remove this item">✕</button>
+            </div>
+          </template>
+          <datalist id="items-datalist"></datalist>
 
           <!-- 1B: Live Register -->
           <div id="subview-register" class="space-y-5 hidden">
@@ -194,6 +220,7 @@
                   <input type="text" name="id" required placeholder="Driver ID (e.g. robert)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
                   <input type="text" name="name" required placeholder="Full Name (e.g. Robert Smith)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
                 </div>
+                <input type="tel" name="phone" placeholder="Phone number" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
                   Add Active Driver
                 </button>
@@ -261,6 +288,24 @@
               </form>
             </div>
 
+            <!-- New Item Registration Form -->
+            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+              <button id="btn-toggle-add-item" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
+                <span>+ Register New Item</span>
+                <span id="add-item-arrow" class="transition-transform">▼</span>
+              </button>
+              <form id="add-item-form" class="space-y-3 mt-3 hidden">
+                <input type="text" name="name" required placeholder="Item name (e.g. MS Elbow 2 inch)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                <div class="grid grid-cols-2 gap-2">
+                  <input type="text" name="code" placeholder="Item code (optional)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="text" name="unit" placeholder="Unit (Nos/Kg/Mtr/Box)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
+                  Add Item
+                </button>
+              </form>
+            </div>
+
             <div>
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Driver Registries</h3>
               <div id="drivers-list-container" class="space-y-2"></div>
@@ -276,6 +321,10 @@
             <div>
               <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Supplier Directory</h3>
               <div id="suppliers-list-container" class="space-y-2"></div>
+            </div>
+            <div>
+              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Item Master</h3>
+              <div id="items-list-container" class="space-y-2"></div>
             </div>
           </div>
 
@@ -301,6 +350,7 @@
               <div>
                 <!-- Simulated Driver Dropdown Selection to solve filter mismatch issues -->
                 <select id="driver-profile-selector" class="bg-slate-800 text-white text-xs font-bold border-none outline-none rounded p-1 max-w-[150px] cursor-pointer focus:ring-1 focus:ring-indigo-500"></select>
+                <div id="driver-profile-phone" class="text-[10px] text-slate-400 font-semibold mt-0.5"></div>
                 <div class="text-[10px] text-emerald-400 font-semibold mt-0.5 flex items-center">
                   <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-ping"></span> On Duty
                 </div>
@@ -451,6 +501,8 @@
       vehicles: [],
       suppliers: [],                // Imported/registered from canaresai.com Supplier Master
       customers: [],                // Saved customers/companies for the dispatch form
+      items: [],                    // Item master list (what's collected/supplied on runs)
+      demoOtps: {},                 // Offline mirror of driver_daily_otp: `${driverId}|${date}` -> pincode
       notifiedTaskIds: [],          // Task ids we've already beeped/notified the driver about
       currentDriverId: '',          // Dynamically matches active simulated driver profile
       activeNavigationTask: null,   // Currently navigated route
@@ -469,6 +521,8 @@
             state.vehicles = parsed.vehicles || [];
             state.suppliers = parsed.suppliers || [];
             state.customers = parsed.customers || [];
+            state.items = parsed.items || [];
+            state.demoOtps = parsed.demoOtps || {};
             state.notifiedTaskIds = parsed.notifiedTaskIds || [];
             state.unlockedAddresses = parsed.unlockedAddresses || {};
             state.currentDriverId = parsed.currentDriverId || '';
@@ -488,6 +542,8 @@
             vehicles: state.vehicles,
             suppliers: state.suppliers,
             customers: state.customers,
+            items: state.items,
+            demoOtps: state.demoOtps,
             notifiedTaskIds: state.notifiedTaskIds,
             unlockedAddresses: state.unlockedAddresses,
             currentDriverId: state.currentDriverId
@@ -547,10 +603,67 @@
         renumberDeliveryStops();
       });
       clone.querySelector('.add-customer-shortcut').addEventListener('click', () => window.openAddCustomerFromDispatch());
+      clone.querySelector('.add-item-row-btn').addEventListener('click', (e) => {
+        addItemRow(e.target.closest('.delivery-stop'));
+      });
+
+      // Autofill the phone number when the typed name matches a saved
+      // customer (picked from the datalist); still freely editable/overridable
+      // for a one-off customer that isn't saved yet.
+      clone.querySelector('.stop-customer').addEventListener('input', (e) => {
+        const stopEl = e.target.closest('.delivery-stop');
+        const match = state.customers.find(c => c.name.toLowerCase() === e.target.value.trim().toLowerCase());
+        if (match && match.phone) {
+          stopEl.querySelector('.stop-customer-phone').value = match.phone;
+        }
+      });
 
       container.appendChild(clone);
-      populateSupplierSelect(container.lastElementChild.querySelector('.stop-supplier'));
+      const newStopEl = container.lastElementChild;
+      populateSupplierSelect(newStopEl.querySelector('.stop-supplier'));
+      addItemRow(newStopEl); // seed with one blank item row
       renumberDeliveryStops();
+    }
+
+    // --- One item line (name/qty/unit) inside a delivery stop's item list ---
+    function addItemRow(stopEl) {
+      const template = document.getElementById('item-row-template');
+      const itemsContainer = stopEl.querySelector('.stop-items-container');
+      const clone = template.content.cloneNode(true);
+
+      clone.querySelector('.remove-item-row-btn').addEventListener('click', (e) => {
+        e.target.closest('.item-row').remove();
+      });
+
+      // Autofill the unit when the typed name matches a registered item;
+      // still freely editable for a one-off item that isn't in the master list.
+      clone.querySelector('.item-row-name').addEventListener('input', (e) => {
+        const rowEl = e.target.closest('.item-row');
+        const match = state.items.find(i => i.name.toLowerCase() === e.target.value.trim().toLowerCase());
+        if (match && match.unit) {
+          rowEl.querySelector('.item-row-unit').value = match.unit;
+        }
+      });
+
+      itemsContainer.appendChild(clone);
+    }
+
+    // Reads one delivery stop's item rows into {item_name, item_code, quantity, unit}[],
+    // matching against the item master for item_code where the typed name matches;
+    // blank rows are dropped.
+    function collectStopItems(stopEl) {
+      const rows = stopEl.querySelectorAll('.item-row');
+      return Array.from(rows).map(row => {
+        const name = row.querySelector('.item-row-name').value.trim();
+        if (!name) return null;
+        const match = state.items.find(i => i.name.toLowerCase() === name.toLowerCase());
+        return {
+          item_name: name,
+          item_code: match ? match.code : '',
+          quantity: row.querySelector('.item-row-qty').value || 1,
+          unit: row.querySelector('.item-row-unit').value.trim()
+        };
+      }).filter(Boolean);
     }
 
     function renumberDeliveryStops() {
@@ -575,6 +688,7 @@
         ['btn-toggle-add-vehicle', 'add-vehicle-form', 'add-vehicle-arrow'],
         ['btn-toggle-add-customer', 'add-customer-form', 'add-customer-arrow'],
         ['btn-toggle-add-supplier', 'add-supplier-form', 'add-supplier-arrow'],
+        ['btn-toggle-add-item', 'add-item-form', 'add-item-arrow'],
       ];
       toggles.forEach(([btnId, formId, arrowId]) => {
         const btn = document.getElementById(btnId);
@@ -727,13 +841,15 @@
         const form = e.target;
         const payload = {
           id: form.id.value.toLowerCase().trim(),
-          name: form.name.value.trim()
+          name: form.name.value.trim(),
+          phone: form.phone.value.trim()
         };
 
         if (state.isDemoMode) {
           const newDriver = {
             id: payload.id,
             name: payload.name,
+            phone: payload.phone,
             status: 'Available',
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${payload.id}&backgroundColor=transparent`
           };
@@ -870,6 +986,40 @@
         }
       });
 
+      // New: Register Item (item master list)
+      document.getElementById('add-item-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const form = e.target;
+        const payload = {
+          name: form.name.value.trim(),
+          code: form.code.value.trim().toUpperCase(),
+          unit: form.unit.value.trim()
+        };
+
+        if (state.isDemoMode) {
+          const code = payload.code || `ITM-${Math.floor(1000 + Math.random()*9000)}`;
+          state.items.push({ code, name: payload.name, unit: payload.unit, status: 'active' });
+          saveState();
+          triggerToast(`Item "${payload.name}" added locally!`);
+          form.reset();
+          document.getElementById('btn-toggle-add-item').click();
+          updateDOMControllers();
+          return;
+        }
+
+        try {
+          const res = await fetchApi('api/add_item_api.php', 'POST', payload);
+          if (res.status === 'success') {
+            triggerToast(`Item "${payload.name}" saved to Database!`);
+            form.reset();
+            document.getElementById('btn-toggle-add-item').click();
+            pollDatabaseState();
+          }
+        } catch (err) {
+          triggerToast("Failed to save item", true);
+        }
+      });
+
       // 3. Employee creates one or more delivery/collection stops and directly dispatches
       document.getElementById('create-task-form').addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -887,9 +1037,11 @@
         const stops = Array.from(stopEls).map(el => ({
           type,
           customer: el.querySelector('.stop-customer').value.trim(),
+          customer_phone: el.querySelector('.stop-customer-phone').value.trim(),
           area: el.querySelector('.stop-area').value.trim(),
           exact_address: el.querySelector('.stop-address').value.trim(),
-          supplier_code: el.querySelector('.stop-supplier').value
+          supplier_code: el.querySelector('.stop-supplier').value,
+          items: collectStopItems(el)
         }));
 
         if (stops.length === 0 || stops.some(s => !s.customer || !s.area || !s.exact_address)) {
@@ -907,25 +1059,38 @@
           const distance = `${(Math.random() * 8 + 1).toFixed(1)} km`;
           const eta = `${Math.floor(Math.random() * 30 + 10)} mins`;
 
+          // Mirrors the real backend's driver_daily_otp table locally: one
+          // pincode per driver per calendar date, reused across every task
+          // assigned to them today instead of a fresh one per task.
+          const today = new Date().toISOString().slice(0, 10);
+          const otpKey = `${driverId}|${today}`;
+          if (!state.demoOtps[otpKey]) {
+            state.demoOtps[otpKey] = Math.floor(1000 + Math.random()*9000).toString();
+          }
+          const dailyPincode = state.demoOtps[otpKey];
+
           stops.forEach(stop => {
             const mockTaskId = `TSK-${Math.floor(1000 + Math.random()*9000)}`;
-            const pincode = Math.floor(1000 + Math.random()*9000).toString();
             const targetSupplier = state.suppliers.find(s => s.code === stop.supplier_code);
-            pincodes.push(pincode);
+            pincodes.push(dailyPincode);
 
             state.tasks.unshift({
               id: mockTaskId,
               batch_id: batchId,
               type: stop.type,
               customer: stop.customer,
+              customer_phone: stop.customer_phone,
               area: stop.area,
               exact_address: stop.exact_address,
               supplier_code: stop.supplier_code || '',
               supplier_name: targetSupplier ? targetSupplier.name : '',
-              pincode: pincode,
+              supplier_phone: targetSupplier ? targetSupplier.phone : '',
+              items: stop.items || [],
+              pincode: dailyPincode,
               status: 'assigned',
               driver_id: driverId,
               driver_name: targetDriver ? targetDriver.name : 'Unknown',
+              driver_phone: targetDriver ? targetDriver.phone : '',
               vehicle_id: vehicleId,
               distance,
               eta
@@ -1007,7 +1172,7 @@
       // 5. Fuel Voucher Request Handler
       document.getElementById('fuel-request-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const driverActiveVehicle = state.vehicles.find(v => v.status === 'In Use') || state.vehicles[0];
+        const driverActiveVehicle = getDriverActiveVehicle(state.currentDriverId);
         if (!driverActiveVehicle) {
           triggerToast("No active vehicle detected", true);
           return;
@@ -1067,11 +1232,12 @@
     // --- State Synchronizer Cycles ---
     async function pollDatabaseState() {
       try {
-        const [tasksRes, fleetRes, suppliersRes, customersRes] = await Promise.all([
+        const [tasksRes, fleetRes, suppliersRes, customersRes, itemsRes] = await Promise.all([
           fetchApi('api/get_active_tasks_api.php'),
           fetchApi('api/get_fleet_registries_api.php'),
           fetchApi('api/get_suppliers_api.php'),
-          fetchApi('api/get_customers_api.php')
+          fetchApi('api/get_customers_api.php'),
+          fetchApi('api/get_items_api.php')
         ]);
 
         state.isDemoMode = false;
@@ -1080,6 +1246,7 @@
         state.vehicles = fleetRes.data.vehicles;
         state.suppliers = suppliersRes.data;
         state.customers = customersRes.data;
+        state.items = itemsRes.data;
 
         // Render live DB badge
         const badge = document.getElementById('db-status-badge');
@@ -1175,16 +1342,26 @@
       const drvSelect = document.getElementById('driver-select');
       const vehSelect = document.getElementById('vehicle-select');
 
-      const availableDrivers = state.drivers.filter(d => d.status === 'Available');
-      const availableVehicles = state.vehicles.filter(v => v.status === 'Available');
+      // Every registered driver AND vehicle stays selectable here regardless
+      // of status - both can now be handed another task even while Busy /
+      // In Use with one already Pending/In Progress. Available ones are
+      // just listed first for convenience; status is shown, never used to hide.
+      const allDrivers = [...state.drivers].sort((a, b) => {
+        if (a.status === b.status) return a.name.localeCompare(b.name);
+        return a.status === 'Available' ? -1 : 1;
+      });
+      const allVehicles = [...state.vehicles].sort((a, b) => {
+        if (a.status === b.status) return a.plate.localeCompare(b.plate);
+        return a.status === 'Available' ? -1 : 1;
+      });
 
-      drvSelect.innerHTML = availableDrivers.length
-        ? availableDrivers.map(d => `<option value="${d.id}">${d.name}</option>`).join('')
-        : `<option value="">No drivers available</option>`;
+      drvSelect.innerHTML = allDrivers.length
+        ? allDrivers.map(d => `<option value="${d.id}">${d.name}${d.status !== 'Available' ? ` (${d.status} — extra task)` : ''}</option>`).join('')
+        : `<option value="">No drivers registered</option>`;
 
-      vehSelect.innerHTML = availableVehicles.length
-        ? availableVehicles.map(v => `<option value="${v.id}">${v.plate} (${v.model}) - Fuel: ${v.fuel}%</option>`).join('')
-        : `<option value="">No vehicles available</option>`;
+      vehSelect.innerHTML = allVehicles.length
+        ? allVehicles.map(v => `<option value="${v.id}">${v.plate} (${v.model}) - Fuel: ${v.fuel}%${v.status !== 'Available' ? ` — ${v.status}, extra task` : ''}</option>`).join('')
+        : `<option value="">No vehicles registered</option>`;
 
       // Every delivery-stop block on the dispatch form gets its own supplier picker
       document.querySelectorAll('.stop-supplier').forEach(populateSupplierSelect);
@@ -1193,6 +1370,12 @@
       const customerList = document.getElementById('customer-datalist');
       if (customerList) {
         customerList.innerHTML = state.customers.map(c => `<option value="${c.name}"></option>`).join('');
+      }
+
+      // Item name autocomplete for every stop's item rows
+      const itemsList = document.getElementById('items-datalist');
+      if (itemsList) {
+        itemsList.innerHTML = state.items.map(i => `<option value="${i.name}"></option>`).join('');
       }
     }
 
@@ -1227,7 +1410,7 @@
               <img src="${d.avatar}" class="w-8 h-8 rounded-full bg-slate-100" alt="Avatar">
               <div>
                 <div class="font-bold text-slate-800 text-sm">${d.name}</div>
-                <div class="text-[10px] text-slate-400">ID: ${d.id.toUpperCase()}</div>
+                <div class="text-[10px] text-slate-400">ID: ${d.id.toUpperCase()}${d.phone ? ` • ${d.phone}` : ''}</div>
               </div>
             </div>
             <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${d.status === 'Available' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${d.status}</span>
@@ -1287,6 +1470,30 @@
           `).join('')
           : `<div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl"><p class="text-xs text-slate-400 font-semibold">No suppliers registered yet.</p></div>`;
       }
+
+      const itemsContainer = document.getElementById('items-list-container');
+      if (itemsContainer) {
+        itemsContainer.innerHTML = state.items.length
+          ? state.items.map(i => `
+            <div class="bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex items-center justify-between">
+              <div>
+                <div class="font-bold text-slate-800 text-sm">${i.name}</div>
+                <div class="text-[10px] text-slate-400 mt-0.5">${i.code}${i.unit ? ' · ' + i.unit : ''}</div>
+              </div>
+              <span class="text-[10px] px-2.5 py-0.5 font-bold rounded-full ${i.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">${i.status || 'active'}</span>
+            </div>
+          `).join('')
+          : `<div class="p-6 text-center bg-slate-50 border border-slate-100 rounded-xl"><p class="text-xs text-slate-400 font-semibold">No items registered yet.</p></div>`;
+      }
+    }
+
+    // Renders a task's item lines as "2 Nos MS Elbow, 5 Kg Flange" style text
+    function formatItemsList(items) {
+      if (!items || !items.length) return '';
+      return items.map(i => {
+        const qty = i.quantity && Number(i.quantity) !== 1 ? `${i.quantity}${i.unit ? ' ' + i.unit : ''} ` : (i.unit ? `${i.unit} ` : '');
+        return `${qty}${i.item_name}`.trim();
+      }).join(', ');
     }
 
     function renderEmployeeMonitor() {
@@ -1317,15 +1524,27 @@
             <div>
               <span class="text-slate-400 font-semibold block text-[10px] uppercase">Assigned Driver</span>
               <span class="text-slate-700 font-bold">${t.driver_name || 'Unassigned'}</span>
+              ${t.driver_phone ? `<span class="block text-slate-400 text-[10px]">${t.driver_phone}</span>` : ''}
             </div>
             <div>
               <span class="text-slate-400 font-semibold block text-[10px] uppercase">Route Key PIN</span>
               <span class="text-indigo-700 font-mono font-bold tracking-wider">${t.pincode || '----'}</span>
             </div>
+            <div class="col-span-2 pt-1 border-t border-slate-100">
+              <span class="text-slate-400 font-semibold block text-[10px] uppercase">Customer Contact</span>
+              <span class="text-slate-700 font-bold">${t.customer}</span>
+              ${t.customer_phone ? `<span class="block text-slate-500 text-[10px]">${t.customer_phone}</span>` : ''}
+            </div>
             ${t.supplier_code ? `
             <div class="col-span-2 pt-1 border-t border-slate-100">
               <span class="text-slate-400 font-semibold block text-[10px] uppercase">Linked Supplier</span>
               <span class="text-slate-700 font-bold">${t.supplier_code}${t.supplier_name ? ' — ' + t.supplier_name : ''}</span>
+              ${t.supplier_phone ? `<span class="block text-slate-500 text-[10px]">${t.supplier_phone}</span>` : ''}
+            </div>` : ''}
+            ${t.items && t.items.length ? `
+            <div class="col-span-2 pt-1 border-t border-slate-100">
+              <span class="text-slate-400 font-semibold block text-[10px] uppercase">Items</span>
+              <span class="text-slate-700 font-bold">${formatItemsList(t.items)}</span>
             </div>` : ''}
           </div>
           ${(t.status === 'assigned' || t.status === 'in_transit') && t.driver_id
@@ -1336,6 +1555,20 @@
     }
 
     // --- STREAMING_CHUNK: Binding driver view telemetry... ---
+    // Resolves the vehicle actually bound to this driver's current run, via
+    // their own active task - rather than "any vehicle marked In Use",
+    // which picks the wrong vehicle once more than one driver (or more than
+    // one task per driver) is active at the same time.
+    function getDriverActiveVehicle(driverId) {
+      const activeTask = state.tasks.find(t =>
+        t.driver_id === driverId && (t.status === 'assigned' || t.status === 'in_transit'));
+      if (activeTask) {
+        const matched = state.vehicles.find(v => v.id === activeTask.vehicle_id);
+        if (matched) return matched;
+      }
+      return state.vehicles.find(v => v.status === 'In Use') || state.vehicles[0];
+    }
+
     function renderDriverProfile() {
       const profileSelector = document.getElementById('driver-profile-selector');
       if (!profileSelector) return;
@@ -1355,6 +1588,9 @@
       const driverObj = state.drivers.find(d => d.id === state.currentDriverId) || state.drivers[0];
       if (!driverObj) return;
 
+      const phoneEl = document.getElementById('driver-profile-phone');
+      if (phoneEl) phoneEl.textContent = driverObj.phone || '';
+
       if (state.currentDriverId !== driverObj.id) {
         state.currentDriverId = driverObj.id;
       }
@@ -1371,8 +1607,9 @@
         fallback.style.display = 'block';
       }
       
-      // Query active vehicle
-      const boundVehicle = state.vehicles.find(v => v.status === 'In Use') || state.vehicles[0];
+      // Query active vehicle - the one actually tied to this driver's own
+      // active task, not just any vehicle marked In Use.
+      const boundVehicle = getDriverActiveVehicle(driverObj.id);
       if (boundVehicle) {
         const profileFuel = document.getElementById('driver-profile-fuel');
         const tankDisplay = document.getElementById('fuel-tank-display');
@@ -1447,6 +1684,36 @@
                   }
                 </div>
               </div>
+            </div>
+
+            <!-- Who to collect from / deliver to, and the linked supplier if any -->
+            <div class="bg-slate-50 rounded-xl p-2.5 text-xs space-y-1.5">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">${t.type === 'delivery' ? 'Delivering to' : 'Collecting from'}</span>
+                  <span class="font-bold text-slate-800">${t.customer}</span>
+                </div>
+                ${t.customer_phone
+                  ? `<a href="tel:${t.customer_phone}" class="shrink-0 bg-indigo-600 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg">📞 ${t.customer_phone}</a>`
+                  : ''}
+              </div>
+              ${t.supplier_code ? `
+              <div class="flex items-center justify-between pt-1.5 border-t border-slate-200">
+                <div>
+                  <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Linked Supplier</span>
+                  <span class="font-bold text-slate-800">${t.supplier_name || t.supplier_code}</span>
+                </div>
+                ${t.supplier_phone
+                  ? `<a href="tel:${t.supplier_phone}" class="shrink-0 bg-slate-700 text-white text-[10px] font-bold px-2.5 py-1.5 rounded-lg">📞 ${t.supplier_phone}</a>`
+                  : ''}
+              </div>` : ''}
+              ${t.items && t.items.length ? `
+              <div class="pt-1.5 border-t border-slate-200">
+                <span class="text-[9px] font-bold text-slate-400 uppercase tracking-wider block mb-1">${t.type === 'delivery' ? 'Items to Supply' : 'Items to Collect'}</span>
+                <ul class="space-y-0.5">
+                  ${t.items.map(i => `<li class="font-semibold text-slate-800">• ${i.quantity && Number(i.quantity) !== 1 ? `${i.quantity}${i.unit ? ' ' + i.unit : ''} ` : (i.unit ? `${i.unit} ` : '')}${i.item_name}</li>`).join('')}
+                </ul>
+              </div>` : ''}
             </div>
 
             <!-- Action Buttons -->
@@ -1552,18 +1819,24 @@
       stopRealGpsReporting();
 
       if (state.isDemoMode) {
-        const activeDriverObj = state.drivers.find(d => d.id === state.currentDriverId) || state.drivers[0];
         const completedTask = state.tasks.find(t => t.id === taskId);
         state.tasks = state.tasks.map(t => t.id === taskId ? { ...t, status: 'completed' } : t);
-        
-        // Release Driver & Vehicle
-        if (activeDriverObj) {
-          state.drivers = state.drivers.map(d => d.id === activeDriverObj.id ? { ...d, status: 'Available' } : d);
-        }
-        
-        const activeVeh = state.vehicles.find(v => v.status === 'In Use') || state.vehicles[0];
-        if (activeVeh) {
-          state.vehicles = state.vehicles.map(v => v.id === activeVeh.id ? { ...v, status: 'Available' } : v);
+
+        // Release Driver & Vehicle only if this was their last non-completed
+        // task - a driver/vehicle can hold several tasks at once now, so
+        // completing one shouldn't free them while another is still active.
+        if (completedTask) {
+          const driverStillBusy = state.tasks.some(t =>
+            t.driver_id === completedTask.driver_id && (t.status === 'assigned' || t.status === 'in_transit'));
+          if (!driverStillBusy) {
+            state.drivers = state.drivers.map(d => d.id === completedTask.driver_id ? { ...d, status: 'Available' } : d);
+          }
+
+          const vehicleStillBusy = state.tasks.some(t =>
+            t.vehicle_id === completedTask.vehicle_id && (t.status === 'assigned' || t.status === 'in_transit'));
+          if (!vehicleStillBusy) {
+            state.vehicles = state.vehicles.map(v => v.id === completedTask.vehicle_id ? { ...v, status: 'Available' } : v);
+          }
         }
 
         saveState();
