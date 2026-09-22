@@ -1,87 +1,125 @@
-// ============================================================
-// TallyField — service worker (Workbox, GitHub Pages / static build)
-// Registered with a relative path (./service-worker.js) so its scope
-// resolves correctly under a project subpath like
-// https://<user>.github.io/<repo>/ — an absolute "/service-worker.js"
-// registration would scope to the domain root and fail on Pages.
-// ============================================================
+// service-worker.js — Workbox-powered service worker for Direct Dispatch & Fleet Controller
+//
+// Bump CACHE_VERSION whenever you deploy changed static files. It changes the
+// underlying Workbox cache names, so old entries are dropped and clients pick
+// up fresh files automatically (see "activate" cleanup below).
+//
+// IMPORTANT: this was left at 'v1' since the very first deploy, which is why
+// updates stopped reaching installed/cached copies of the app — the service
+// worker file never changed byte-for-byte, so browsers never even detected
+// there was a new version to install. Bump this on every future deploy
+// (v2 -> v3 -> v4 ...), otherwise this exact problem comes back.
+const CACHE_VERSION = 'v4';
 
 importScripts('https://storage.googleapis.com/workbox-cdn/releases/7.1.0/workbox-sw.js');
 
-const VERSION = 'v3';
-
 if (workbox) {
   workbox.setConfig({ debug: false });
+  workbox.core.setCacheNameDetails({
+    prefix: 'dispatch-app',
+    suffix: CACHE_VERSION
+  });
 
-  // Take over immediately on install/activate so updates apply without
-  // needing every tab closed — paired with the page-side reload-once
-  // listener in index.html for a fully automatic update flow.
-  workbox.core.skipWaiting();
-  workbox.core.clientsClaim();
+  const { registerRoute, setDefaultHandler, setCatchHandler } = workbox.routing;
+  const { NetworkFirst, StaleWhileRevalidate, CacheFirst, NetworkOnly } = workbox.strategies;
+  const { ExpirationPlugin } = workbox.expiration;
+  const { precacheAndRoute, cleanupOutdatedCaches } = workbox.precaching;
 
-  // --- App shell: precached so the whole app opens with zero network ---
-  workbox.precaching.precacheAndRoute([
-    { url: './', revision: VERSION },
-    { url: './index.html', revision: VERSION },
-    { url: './manifest.json', revision: VERSION },
-    { url: './icons/icon-192.png', revision: VERSION },
-    { url: './icons/icon-512.png', revision: VERSION },
-    { url: './icons/icon-maskable-192.png', revision: VERSION },
-    { url: './icons/icon-maskable-512.png', revision: VERSION },
-    { url: './icons/icon.svg', revision: VERSION },
-    { url: './icons/apple-touch-icon.png', revision: VERSION },
+  // ---- App shell: pre-cached at install time -------------------------------
+  precacheAndRoute([
+    { url: './index.html', revision: CACHE_VERSION },
+    { url: './track_driver.html', revision: CACHE_VERSION },
+    { url: './import_suppliers.html', revision: CACHE_VERSION },
+    { url: './import_customers.html', revision: CACHE_VERSION },
+    { url: './offline.html', revision: CACHE_VERSION },
+    { url: './manifest.json', revision: CACHE_VERSION },
+    { url: './assets/frontend_application_controller.js', revision: CACHE_VERSION },
+    { url: './assets/pwa-controller.js', revision: CACHE_VERSION },
+    { url: './icons/icon-72.png', revision: CACHE_VERSION },
+    { url: './icons/icon-96.png', revision: CACHE_VERSION },
+    { url: './icons/icon-128.png', revision: CACHE_VERSION },
+    { url: './icons/icon-144.png', revision: CACHE_VERSION },
+    { url: './icons/icon-152.png', revision: CACHE_VERSION },
+    { url: './icons/icon-180.png', revision: CACHE_VERSION },
+    { url: './icons/icon-192.png', revision: CACHE_VERSION },
+    { url: './icons/icon-384.png', revision: CACHE_VERSION },
+    { url: './icons/icon-512.png', revision: CACHE_VERSION },
+    { url: './icons/icon-maskable-192.png', revision: CACHE_VERSION },
+    { url: './icons/icon-maskable-512.png', revision: CACHE_VERSION }
   ]);
 
-  // Any other same-origin navigation falls back to the app shell instead
-  // of a network error — this app has no server-side routes to miss.
-  workbox.routing.registerRoute(
+  cleanupOutdatedCaches();
+
+  // ---- CRITICAL: never cache API calls --------------------------------------
+  // This app runs live dispatch/task/driver-location data via api/*.php.
+  // Caching these would show stale data, so they always go straight to the
+  // network and are never stored.
+  registerRoute(
+    ({ url }) => url.pathname.includes('/api/'),
+    new NetworkOnly()
+  );
+
+  // ---- HTML navigations: NetworkFirst with offline fallback -----------------
+  // Always try the network first (so users get the latest page + PHP-rendered
+  // state), fall back to the cached copy, and finally to offline.html if
+  // neither is available.
+  registerRoute(
     ({ request }) => request.mode === 'navigate',
-    new workbox.strategies.NetworkFirst({
-      cacheName: 'tallyfield-pages',
-      networkTimeoutSeconds: 3,
-      plugins: [new workbox.expiration.ExpirationPlugin({ maxEntries: 10 })],
+    new NetworkFirst({
+      cacheName: `dispatch-app-pages-${CACHE_VERSION}`,
+      networkTimeoutSeconds: 8,
+      plugins: [new ExpirationPlugin({ maxEntries: 20 })]
     })
   );
 
-  // Google Fonts: stylesheet revalidates in the background, font files
-  // are cached long-term once fetched — standard Workbox recipe.
-  workbox.routing.registerRoute(
-    ({ url }) => url.origin === 'https://fonts.googleapis.com',
-    new workbox.strategies.StaleWhileRevalidate({ cacheName: 'google-fonts-stylesheets' })
-  );
-  workbox.routing.registerRoute(
-    ({ url }) => url.origin === 'https://fonts.gstatic.com',
-    new workbox.strategies.CacheFirst({
-      cacheName: 'google-fonts-webfonts',
-      plugins: [
-        new workbox.cacheableResponse.CacheableResponsePlugin({ statuses: [0, 200] }),
-        new workbox.expiration.ExpirationPlugin({ maxAgeSeconds: 60 * 60 * 24 * 365, maxEntries: 30 }),
-      ],
+  // ---- Tailwind CDN script: CacheFirst ---------------------------------------
+  // The app styles itself via the Tailwind CDN's runtime JIT script. Caching
+  // it means styling still works even when the app is opened offline.
+  registerRoute(
+    ({ url }) => url.origin === 'https://cdn.tailwindcss.com',
+    new CacheFirst({
+      cacheName: `dispatch-app-cdn-${CACHE_VERSION}`,
+      plugins: [new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 30 * 24 * 60 * 60 })]
     })
   );
 
-  // Any other static asset under this scope (images, icons added later):
-  // cache-first, since this build has no real API calls to worry about
-  // excluding — this build has no real API calls to worry about excluding, all state lives in localStorage.
-  workbox.routing.registerRoute(
-    ({ request }) => ['image', 'font'].includes(request.destination),
-    new workbox.strategies.CacheFirst({
-      cacheName: 'tallyfield-assets',
-      plugins: [new workbox.expiration.ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 60 * 24 * 30 })],
+  // ---- Local JS: StaleWhileRevalidate ----------------------------------------
+  registerRoute(
+    ({ request, url }) => request.destination === 'script' && url.origin === self.location.origin,
+    new StaleWhileRevalidate({ cacheName: `dispatch-app-scripts-${CACHE_VERSION}` })
+  );
+
+  // ---- Images/icons: CacheFirst -----------------------------------------------
+  registerRoute(
+    ({ request }) => request.destination === 'image',
+    new CacheFirst({
+      cacheName: `dispatch-app-images-${CACHE_VERSION}`,
+      plugins: [new ExpirationPlugin({ maxEntries: 60, maxAgeSeconds: 60 * 24 * 60 * 60 })]
     })
   );
-} else {
-  // Workbox failed to load (offline on first install, CDN unreachable):
-  // fall back to a minimal hand-rolled cache so the app still installs.
-  const CACHE_NAME = 'tallyfield-shell-fallback';
-  const SHELL = ['./', './index.html', './manifest.json'];
-  self.addEventListener('install', (e) => {
-    e.waitUntil(caches.open(CACHE_NAME).then((c) => c.addAll(SHELL)));
+
+  // ---- Fallback for failed navigations (fully offline, nothing cached) -------
+  setCatchHandler(async ({ event }) => {
+    if (event.request.mode === 'navigate') {
+      return caches.match('./offline.html');
+    }
+    return Response.error();
+  });
+
+  // ---- Immediate activation on every deploy -----------------------------------
+  self.addEventListener('install', () => {
     self.skipWaiting();
   });
-  self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-  self.addEventListener('fetch', (e) => {
-    if (e.request.method !== 'GET') return;
-    e.respondWith(caches.match(e.request).then((c) => c || fetch(e.request).catch(() => caches.match('./index.html'))));
+  self.addEventListener('activate', (event) => {
+    event.waitUntil(self.clients.claim());
   });
+
+  // Let the page force an update check / activation on demand
+  self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+      self.skipWaiting();
+    }
+  });
+} else {
+  console.error('Workbox failed to load — service worker running without caching.');
 }

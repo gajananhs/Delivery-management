@@ -44,11 +44,16 @@ try {
     // with just a name, same pattern as the free-text customer field.
     $items = is_array($input['items'] ?? null) ? $input['items'] : [];
 
+    // Optional: a link to a whole "items list" PDF the dispatcher uploaded
+    // instead of (or alongside) typing individual item rows - see
+    // upload_task_pdf_api.php, which returns this URL.
+    $itemsPdfUrl = trim($input['items_pdf_url'] ?? '') ?: null;
+
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare("
-        INSERT INTO tasks (id, type, customer, customer_phone, area, exact_address, supplier_code, batch_id, status)
-        VALUES (:id, :type, :customer, :customer_phone, :area, :exact_address, :supplier_code, :batch_id, 'pending_approval')
+        INSERT INTO tasks (id, type, customer, customer_phone, area, exact_address, supplier_code, batch_id, items_pdf_url, status)
+        VALUES (:id, :type, :customer, :customer_phone, :area, :exact_address, :supplier_code, :batch_id, :items_pdf_url, 'pending_approval')
     ");
 
     $stmt->execute([
@@ -59,7 +64,8 @@ try {
         ':area' => $input['area'],
         ':exact_address' => $input['exact_address'],
         ':supplier_code' => $supplierCode,
-        ':batch_id' => $batchId
+        ':batch_id' => $batchId,
+        ':items_pdf_url' => $itemsPdfUrl
     ]);
 
     if (!empty($items)) {
