@@ -17,11 +17,15 @@ try {
     }
 
     // Server-side input validation
-    if (empty($input['type']) || empty($input['customer']) || empty($input['area']) || empty($input['exact_address'])) {
+    // Customer and supplier are each optional (a stop may be for a customer
+    // only, a supplier only, or both) - but at least one of them is required.
+    $customerName = trim($input['customer'] ?? '');
+    if (empty($input['type']) || empty($input['area']) || empty($input['exact_address'])
+        || ($customerName === '' && empty($input['supplier_code']))) {
         http_response_code(400);
         echo json_encode([
             "status" => "error",
-            "message" => "Incomplete request body. Missing type, customer, area, or exact_address parameters."
+            "message" => "Incomplete request body. Missing type, area, exact_address, or both customer and supplier_code."
         ]);
         exit;
     }
@@ -59,7 +63,7 @@ try {
     $stmt->execute([
         ':id' => $id,
         ':type' => $input['type'],
-        ':customer' => $input['customer'],
+        ':customer' => $customerName,
         ':customer_phone' => $customerPhone,
         ':area' => $input['area'],
         ':exact_address' => $input['exact_address'],
