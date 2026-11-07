@@ -1635,6 +1635,11 @@
           ${(t.status === 'assigned' || t.status === 'in_transit') && t.driver_id
             ? `<a href="track_driver.html?driver=${encodeURIComponent(t.driver_id)}" target="_blank" class="block text-center text-[11px] font-bold text-indigo-600 hover:text-indigo-700 pt-1">📍 Track live GPS location</a>`
             : ''}
+          ${t.verified_at ? `
+          <div class="flex items-center gap-2 text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>Verified by security${t.verified_by ? ' — ' + t.verified_by : ''}</span>
+          </div>` : ''}
           ${t.status === 'completed'
             ? `<button onclick="confirmDeleteTask('${t.id}', '${t.id} — ${taskPartyName(t).replace(/'/g, "\\'")}')" class="w-full bg-red-50 hover:bg-red-100 text-red-600 py-2 rounded-xl text-[11px] font-bold">Delete Task</button>`
             : ''}
