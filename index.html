@@ -150,7 +150,21 @@
 
     /* ---- App shell ---- */
     #db-status-badge { white-space: nowrap; }
+    #role-btn-employee, #role-btn-driver { white-space: nowrap; }
     .app-frame { overflow: clip !important; box-shadow: 0 30px 70px -20px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04); }
+    @media (min-width: 640px) {
+      /* On a computer: keep the app phone-sized (width AND height). The content
+         scrolls inside the phone, and the bottom icon bar stays in place. */
+      .app-frame {
+        height: min(900px, calc(100vh - 8rem));
+        min-height: 0 !important;
+        overflow: hidden !important;
+        margin-bottom: 1rem;
+      }
+      .app-frame > div { min-height: 0; }
+      #view-employee > .overflow-y-auto,
+      #view-driver > main { min-height: 0; overscroll-behavior: contain; }
+    }
     @media (max-width: 639px) {
       /* On a real phone use the whole screen instead of a framed mock-up */
       .app-frame { margin-top: 0 !important; border: 0 !important; border-radius: 0 !important; min-height: calc(100vh - 4.5rem) !important; box-shadow: none; }
