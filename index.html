@@ -112,9 +112,45 @@
     }
     .btn-ghost-dashed:hover { background: #eef2ff; border-color: #818cf8; }
 
+    /* ---- Floating bottom dock (icon navigation) ---- */
+    .dock {
+      position: sticky; bottom: .75rem; z-index: 30;
+      margin: 0 .875rem .875rem; padding: .35rem;
+      display: flex; gap: .25rem;
+      background: rgba(255,255,255,.97);
+      -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+      border: 1px solid #e6ebf2; border-radius: 1.75rem;
+      box-shadow: 0 14px 34px -10px rgba(15,23,42,.35), 0 2px 6px rgba(15,23,42,.06);
+    }
+    .dock-item {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .2rem;
+      padding: .5rem .25rem; border-radius: 1.4rem;
+      font-size: .625rem; font-weight: 700; letter-spacing: .01em; color: #64748b;
+      transition: background-color .15s ease, color .15s ease;
+    }
+    .dock-item svg { width: 1.4rem; height: 1.4rem; }
+    .dock-item:hover { color: #334155; background: #f8fafc; }
+    .dock-item.is-active { background: #eef2ff; color: #4338ca; }
+
+    /* ---- Section headings (icon chip + title + record count) ---- */
+    .sec-head { display: flex; align-items: center; gap: .65rem; margin-bottom: .7rem; }
+    .sec-ico {
+      width: 2rem; height: 2rem; border-radius: .65rem; flex-shrink: 0;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: #eef2ff; color: #4f46e5;
+    }
+    .sec-ico svg { width: 1.1rem; height: 1.1rem; }
+    .sec-title { font-size: .9rem; font-weight: 800; color: #0f172a; letter-spacing: -.005em; }
+    .sec-count { font-size: .8rem; font-weight: 600; color: #94a3b8; }
+    .sec-sub { font-size: .75rem; color: #64748b; margin-top: .1rem; }
+
+    .reg-card { background: #fff; border: 1px solid #e6ebf2; border-radius: 1rem; padding: .85rem 1rem; box-shadow: 0 1px 2px rgba(15,23,42,.04); }
+    .reg-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: .65rem; text-align: left; }
+    .reg-toggle .lbl { flex: 1; font-size: .8rem; font-weight: 700; color: #1e293b; }
+
     /* ---- App shell ---- */
     #db-status-badge { white-space: nowrap; }
-    .app-frame { box-shadow: 0 30px 70px -20px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04); }
+    .app-frame { overflow: clip !important; box-shadow: 0 30px 70px -20px rgba(0,0,0,.65), 0 0 0 1px rgba(255,255,255,.04); }
     @media (max-width: 639px) {
       /* On a real phone use the whole screen instead of a framed mock-up */
       .app-frame { margin-top: 0 !important; border: 0 !important; border-radius: 0 !important; min-height: calc(100vh - 4.5rem) !important; box-shadow: none; }
@@ -140,10 +176,12 @@
         <span class="text-slate-400 font-semibold text-[11px] uppercase tracking-widest">Active Workspace</span>
       </div>
       <div class="flex bg-slate-950 rounded-xl p-1 shadow-inner border border-slate-800 w-full sm:w-auto">
-        <button id="role-btn-employee" class="px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center flex-1 bg-indigo-600 text-white shadow-md">
+        <button id="role-btn-employee" class="flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-indigo-600 text-white shadow-md">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0012 15.75a7.488 7.488 0 00-5.982 2.975m11.963 0a9 9 0 10-11.963 0m11.963 0A8.966 8.966 0 0112 21a8.966 8.966 0 01-5.982-2.275M15 9.75a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
           Employee Console
         </button>
-        <button id="role-btn-driver" class="px-5 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center flex-1 text-slate-400 hover:text-white">
+        <button id="role-btn-driver" class="flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M3.75 12h16.5M12 15.75V12m-6.75 0h13.5M3 9.75l1.658-3.316a3 3 0 012.683-1.684h10.318a3 3 0 012.683 1.684L21 9.75"/></svg>
           Driver App
         </button>
       </div>
@@ -169,7 +207,7 @@
       <!-- SECTION 1: EMPLOYEE VIEW                       -->
       <!-- ============================================== -->
       <div id="view-employee" class="flex flex-col h-full flex-1">
-        <header class="bg-gradient-to-br from-indigo-700 via-indigo-700 to-violet-700 text-white px-6 pt-10 pb-7 rounded-b-[2rem] shadow-lg">
+        <header class="bg-gradient-to-br from-indigo-700 via-indigo-700 to-violet-700 text-white px-6 pt-9 pb-6 rounded-b-[2rem] shadow-lg">
           <div class="flex justify-between items-center gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div class="w-11 h-11 rounded-2xl bg-white/15 ring-1 ring-white/20 flex items-center justify-center shrink-0">
@@ -184,27 +222,23 @@
           </div>
         </header>
 
-        <!-- Sub Tab Navigation -->
-        <div class="mx-5 -mt-4 relative z-10 p-1 bg-white rounded-2xl shadow-md border border-slate-100 flex space-x-1">
-          <button id="tab-btn-assign" class="flex-1 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-sm transition-all">Create & Assign</button>
-          <button id="tab-btn-register" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">Live Register</button>
-          <button id="tab-btn-monitor" class="flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all">Fleet Activity</button>
-        </div>
-
-        <div class="p-5 flex-1 overflow-y-auto pb-8">
+        <div class="p-5 flex-1 overflow-y-auto pb-6">
           <!-- 1A: Assign Form -->
           <div id="subview-assign" class="space-y-4">
-            <div class="px-0.5">
-              <h2 class="font-extrabold text-slate-900 text-base tracking-tight">Dispatch Task Directly</h2>
-              <p class="text-xs text-slate-500 mt-0.5">Send a driver to a customer, a supplier, or both.</p>
+            <div class="sec-head" style="margin-bottom:.25rem">
+              <span class="sec-ico" style="width:2.4rem;height:2.4rem;border-radius:.8rem"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg></span>
+              <div>
+                <h2 class="sec-title" style="font-size:1rem">Dispatch Task Directly</h2>
+                <p class="sec-sub">Send a driver to a customer, a supplier, or both.</p>
+              </div>
             </div>
             <div>
               <form id="create-task-form" class="space-y-4">
                 <div class="form-section">
                   <label class="fld-label">Request Type</label>
                   <div class="flex bg-slate-100 p-1 rounded-xl">
-                    <button type="button" id="form-type-delivery" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white text-indigo-700 shadow-sm">Delivery</button>
-                    <button type="button" id="form-type-collection" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-500">Collection</button>
+                    <button type="button" id="form-type-delivery" class="flex-1 py-1.5 text-xs font-bold rounded-lg bg-white text-indigo-700 shadow-sm"><span class="inline-flex items-center justify-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M3.75 12h16.5M12 15.75V12m-6.75 0h13.5M3 9.75l1.658-3.316a3 3 0 012.683-1.684h10.318a3 3 0 012.683 1.684L21 9.75"/></svg>Delivery</span></button>
+                    <button type="button" id="form-type-collection" class="flex-1 py-1.5 text-xs font-bold rounded-lg text-slate-500"><span class="inline-flex items-center justify-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>Collection</span></button>
                   </div>
                   <input type="hidden" name="type" id="task-type-input" value="delivery">
                 </div>
@@ -353,100 +387,110 @@
           <!-- 1B: Live Register -->
           <div id="subview-register" class="space-y-5 hidden">
             <!-- New Driver Registration Form -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <button id="btn-toggle-add-driver" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <span>+ Register New Driver</span>
-                <span id="add-driver-arrow" class="transition-transform">▼</span>
+            <div class="reg-card">
+              <button id="btn-toggle-add-driver" class="reg-toggle">
+                <span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.5 20.118a7.5 7.5 0 0115 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.5-1.632z"/></svg></span>
+                <span class="lbl">Register New Driver</span>
+                <span id="add-driver-arrow" class="transition-transform text-slate-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
               </button>
               <form id="add-driver-form" class="space-y-3 mt-3 hidden">
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="text" name="id" required placeholder="Driver ID (e.g. robert)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="name" required placeholder="Full Name (e.g. Robert Smith)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="text" name="id" required placeholder="Driver ID (e.g. robert)" class="fld fld-sm">
+                  <input type="text" name="name" required placeholder="Full Name (e.g. Robert Smith)" class="fld fld-sm">
                 </div>
-                <input type="tel" name="phone" placeholder="Phone number" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
+                <input type="tel" name="phone" placeholder="Phone number" class="fld fld-sm">
+                <button type="submit" class="btn-primary" style="padding:.65rem;font-size:.75rem;border-radius:.7rem">
                   Add Active Driver
                 </button>
               </form>
             </div>
 
             <!-- New Vehicle Registration Form -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <button id="btn-toggle-add-vehicle" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <span>+ Register New Vehicle</span>
-                <span id="add-vehicle-arrow" class="transition-transform">▼</span>
+            <div class="reg-card">
+              <button id="btn-toggle-add-vehicle" class="reg-toggle">
+                <span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M3.75 12h16.5M12 15.75V12m-6.75 0h13.5M3 9.75l1.658-3.316a3 3 0 012.683-1.684h10.318a3 3 0 012.683 1.684L21 9.75"/></svg></span>
+                <span class="lbl">Register New Vehicle</span>
+                <span id="add-vehicle-arrow" class="transition-transform text-slate-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
               </button>
               <form id="add-vehicle-form" class="space-y-3 mt-3 hidden">
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="text" name="id" required placeholder="Vehicle ID (e.g. V-400)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="plate" required placeholder="License Plate" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="text" name="id" required placeholder="Vehicle ID (e.g. V-400)" class="fld fld-sm">
+                  <input type="text" name="plate" required placeholder="License Plate" class="fld fld-sm">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="text" name="model" required placeholder="Model (e.g. Ford Transit)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="number" name="fuel" required min="1" max="100" placeholder="Initial Fuel %" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="text" name="model" required placeholder="Model (e.g. Ford Transit)" class="fld fld-sm">
+                  <input type="number" name="fuel" required min="1" max="100" placeholder="Initial Fuel %" class="fld fld-sm">
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
+                <button type="submit" class="btn-primary" style="padding:.65rem;font-size:.75rem;border-radius:.7rem">
                   Register Vehicle Unit
                 </button>
               </form>
             </div>
 
             <!-- New Customer Registration Form -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <button id="btn-toggle-add-customer" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <span>+ Register New Customer</span>
-                <span id="add-customer-arrow" class="transition-transform">▼</span>
+            <div class="reg-card">
+              <button id="btn-toggle-add-customer" class="reg-toggle">
+                <span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg></span>
+                <span class="lbl">Register New Customer</span>
+                <span id="add-customer-arrow" class="transition-transform text-slate-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
               </button>
               <form id="add-customer-form" class="space-y-3 mt-3 hidden">
-                <input type="text" name="name" required placeholder="Company / Customer name" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                <input type="text" name="name" required placeholder="Company / Customer name" class="fld fld-sm">
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="tel" name="phone" placeholder="Contact number" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="city" placeholder="City" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="tel" name="phone" placeholder="Contact number" class="fld fld-sm">
+                  <input type="text" name="city" placeholder="City" class="fld fld-sm">
                 </div>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
+                <button type="submit" class="btn-primary" style="padding:.65rem;font-size:.75rem;border-radius:.7rem">
                   Add Customer
                 </button>
               </form>
             </div>
 
             <!-- New Supplier Registration Form -->
-            <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
-              <button id="btn-toggle-add-supplier" class="w-full flex justify-between items-center text-xs font-bold text-slate-700 uppercase tracking-wider">
-                <span>+ Register New Supplier</span>
-                <span id="add-supplier-arrow" class="transition-transform">▼</span>
+            <div class="reg-card">
+              <button id="btn-toggle-add-supplier" class="reg-toggle">
+                <span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"/></svg></span>
+                <span class="lbl">Register New Supplier</span>
+                <span id="add-supplier-arrow" class="transition-transform text-slate-400"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg></span>
               </button>
               <form id="add-supplier-form" class="space-y-3 mt-3 hidden">
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="text" name="code" required placeholder="Supplier code (e.g. SUP-050)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="name" required placeholder="Supplier name" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="text" name="code" required placeholder="Supplier code (e.g. SUP-050)" class="fld fld-sm">
+                  <input type="text" name="name" required placeholder="Supplier name" class="fld fld-sm">
                 </div>
                 <div class="grid grid-cols-2 gap-2">
-                  <input type="tel" name="phone" placeholder="Contact number" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
-                  <input type="text" name="city" placeholder="City" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs outline-none focus:border-indigo-500">
+                  <input type="tel" name="phone" placeholder="Contact number" class="fld fld-sm">
+                  <input type="text" name="city" placeholder="City" class="fld fld-sm">
                 </div>
                 <p class="text-[10px] text-slate-400">Importing the full canaresai.com list instead? Use <a href="import_suppliers.html" target="_blank" class="text-indigo-600 font-semibold">Import CSV</a>.</p>
-                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-bold text-xs shadow-sm">
+                <button type="submit" class="btn-primary" style="padding:.65rem;font-size:.75rem;border-radius:.7rem">
                   Add Supplier
                 </button>
               </form>
             </div>
 
             <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Driver Registries</h3>
+              <div class="sec-head"><span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg></span><h3 class="sec-title">Driver Registries</h3><span id="drivers-count" class="sec-count"></span></div>
               <div id="drivers-list-container" class="space-y-2"></div>
             </div>
             <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Vehicle Matrix</h3>
+              <div class="sec-head"><span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M3.75 12h16.5M12 15.75V12m-6.75 0h13.5M3 9.75l1.658-3.316a3 3 0 012.683-1.684h10.318a3 3 0 012.683 1.684L21 9.75"/></svg></span><h3 class="sec-title">Vehicle Matrix</h3><span id="vehicles-count" class="sec-count"></span></div>
               <div id="vehicles-list-container" class="space-y-2"></div>
             </div>
           </div>
 
           <!-- 1C: Fleet Monitor -->
           <div id="subview-monitor" class="space-y-3 hidden">
-            <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Ongoing Route Deliveries</h3>
+            <div class="sec-head"><span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg></span><h3 class="sec-title">Ongoing Route Deliveries</h3><span id="tasks-count" class="sec-count"></span></div>
             <div id="active-tasks-container" class="space-y-3"></div>
           </div>
         </div>
+        <!-- Bottom icon dock: switches the Employee sub-views (same ids/behaviour as the old top tabs) -->
+        <nav class="dock" aria-label="Employee sections">
+          <button id="tab-btn-assign" class="dock-item is-active"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg><span>Create &amp; Assign</span></button>
+          <button id="tab-btn-register" class="dock-item"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg><span>Live Register</span></button>
+          <button id="tab-btn-monitor" class="dock-item"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg><span>Fleet Activity</span></button>
+        </nav>
       </div>
 
       <!-- ============================================== -->
@@ -478,11 +522,11 @@
           </div>
         </header>
 
-        <main class="flex-1 overflow-y-auto pb-20">
+        <main class="flex-1 overflow-y-auto pb-6">
           <!-- 2A: Driver Tasks -->
           <div id="driver-subview-tasks" class="p-4 space-y-4">
             <div>
-              <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Route Inbox</h3>
+              <div class="sec-head"><span class="sec-ico"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg></span><h3 class="sec-title">Route Inbox</h3><span id="inbox-count" class="sec-count"></span></div>
               <div id="driver-tasks-container" class="space-y-4"></div>
             </div>
           </div>
@@ -513,7 +557,7 @@
             </div>
 
             <!-- Floater Information Card -->
-            <div class="absolute bottom-24 left-4 right-4 bg-white rounded-xl shadow-xl p-4 border border-slate-100 text-xs space-y-2">
+            <div class="absolute bottom-6 left-4 right-4 bg-white rounded-xl shadow-xl p-4 border border-slate-100 text-xs space-y-2">
               <span class="text-[10px] text-indigo-600 uppercase font-bold tracking-wider">Simulating GPS Tracking</span>
               <h4 id="gps-address-display" class="font-bold text-slate-800 leading-tight">Address</h4>
               <div class="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
@@ -552,19 +596,10 @@
         </main>
 
         <!-- Driver Bottom Navigation Bar -->
-        <nav class="absolute bottom-0 w-full bg-white border-t border-slate-200 px-6 py-4 flex justify-between items-center z-20 pb-6 rounded-b-[2rem]">
-          <button id="nav-btn-tasks" class="flex flex-col items-center text-blue-600">
-            <svg class="w-5.5 h-5.5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg>
-            <span class="text-[10px] font-bold">Tasks</span>
-          </button>
-          <button id="nav-btn-map" class="flex flex-col items-center text-slate-400">
-            <svg class="w-5.5 h-5.5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-.553-.894L15 4m0 13V4m0 0L9 7"/></svg>
-            <span class="text-[10px] font-bold">GPS Map</span>
-          </button>
-          <button id="nav-btn-fuel" class="flex flex-col items-center text-slate-400">
-            <svg class="w-5.5 h-5.5 mb-1" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10"/></svg>
-            <span class="text-[10px] font-bold">Refuel</span>
-          </button>
+        <nav class="dock" aria-label="Driver sections">
+          <button id="nav-btn-tasks" class="dock-item is-active"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5.586a1 1 0 0 1 .707.293l5.414 5.414a1 1 0 0 1 .293.707V19a2 2 0 0 1-2 2z"/></svg><span>Tasks</span></button>
+          <button id="nav-btn-map" class="dock-item"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 0 1 3 16.382V5.618a1 1 0 0 1 1.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0 0 21 18.382V7.618a1 1 0 0 0-.553-.894L15 4m0 13V4m0 0L9 7"/></svg><span>GPS Map</span></button>
+          <button id="nav-btn-fuel" class="dock-item"><svg class="" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11H5m14 0a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2m14 0V9a2 2 0 0 0-2-2M5 11V9a2 2 0 0 1 2-2m0 0V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v2M7 7h10"/></svg><span>Refuel</span></button>
         </nav>
       </div>
 
@@ -939,8 +974,8 @@
 
       empBtn.addEventListener('click', () => {
         state.currentRole = 'employee';
-        empBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition-all bg-indigo-600 text-white shadow-md";
-        drvBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white";
+        empBtn.className = "flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-indigo-600 text-white shadow-md";
+        drvBtn.className = "flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white";
         empView.classList.remove('hidden');
         drvView.classList.add('hidden');
         renderActiveRoleView();
@@ -948,8 +983,8 @@
 
       drvBtn.addEventListener('click', () => {
         state.currentRole = 'driver';
-        drvBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white shadow-md";
-        empBtn.className = "px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white";
+        drvBtn.className = "flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all bg-emerald-600 text-white shadow-md";
+        empBtn.className = "flex-1 flex items-center justify-center gap-2 px-5 py-2 rounded-lg text-sm font-bold transition-all text-slate-400 hover:text-white";
         drvView.classList.remove('hidden');
         empView.classList.add('hidden');
         ensureDriverIdentity();
@@ -978,10 +1013,10 @@
             const targetBtn = document.getElementById(tabs[k].btn);
             const targetView = document.getElementById(tabs[k].view);
             if (k === tabKey) {
-              targetBtn.className = "flex-1 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white shadow-sm transition-all";
+              targetBtn.className = "dock-item is-active";
               targetView.classList.remove('hidden');
             } else {
-              targetBtn.className = "flex-1 py-2 text-xs font-bold rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-all";
+              targetBtn.className = "dock-item";
               targetView.classList.add('hidden');
             }
           });
@@ -1004,10 +1039,10 @@
             const btn = document.getElementById(drvTabs[k].btn);
             const view = document.getElementById(drvTabs[k].view);
             if (k === tabKey) {
-              btn.className = "flex flex-col items-center text-blue-600";
+              btn.className = "dock-item is-active";
               view.classList.remove('hidden');
             } else {
-              btn.className = "flex flex-col items-center text-slate-400";
+              btn.className = "dock-item";
               view.classList.add('hidden');
             }
           });
@@ -1443,11 +1478,19 @@
     }
 
     // --- STREAMING_CHUNK: Drawing live data registers... ---
+    // Display-only helper: writes "· 3 records" next to a section heading.
+    function setRecordCount(id, n) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = `· ${n} ${n === 1 ? 'record' : 'records'}`;
+    }
+
     function renderLiveRegister() {
       const drvContainer = document.getElementById('drivers-list-container');
       const vehContainer = document.getElementById('vehicles-list-container');
 
       if (!drvContainer || !vehContainer) return;
+      setRecordCount('drivers-count', state.drivers.length);
+      setRecordCount('vehicles-count', state.vehicles.length);
 
       if (state.drivers.length === 0) {
         drvContainer.innerHTML = `
@@ -1529,28 +1572,35 @@
     function renderEmployeeMonitor() {
       const container = document.getElementById('active-tasks-container');
       if (!container) return;
+      setRecordCount('tasks-count', state.tasks.length);
 
       if (state.tasks.length === 0) {
         container.innerHTML = `
           <div class="p-8 text-center bg-white border border-slate-100 rounded-2xl shadow-sm">
             <p class="text-xs text-slate-400 font-semibold">No dynamic dispatch routes currently compiled.</p>
-            <p class="text-[11px] text-slate-400 mt-1">To test routing, register active profiles, or select Create &amp; Assign above.</p>
+            <p class="text-[11px] text-slate-400 mt-1">To test routing, register active profiles, or select Create &amp; Assign below.</p>
           </div>
         `;
         return;
       }
 
       container.innerHTML = state.tasks.map(t => `
-        <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 space-y-3 relative overflow-hidden">
-          <div class="absolute top-0 left-0 w-1.5 h-full ${t.type === 'delivery' ? 'bg-indigo-600' : 'bg-purple-600'}"></div>
-          <div class="flex justify-between items-start pl-2">
-            <div>
-              <div class="text-[10px] font-mono text-slate-400 font-bold">${t.id} • ${t.type.toUpperCase()}</div>
-              <h4 class="font-bold text-sm text-slate-800 mt-0.5">${taskPartyName(t)}</h4>
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-3">
+          <div class="flex justify-between items-start gap-2">
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-xl shrink-0 flex items-center justify-center ${t.type === 'delivery' ? 'bg-indigo-50 text-indigo-600' : 'bg-violet-50 text-violet-600'}">
+                ${t.type === 'delivery'
+                  ? `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125a1.125 1.125 0 001.125-1.125V9.75M3.75 12h16.5M12 15.75V12m-6.75 0h13.5M3 9.75l1.658-3.316a3 3 0 012.683-1.684h10.318a3 3 0 012.683 1.684L21 9.75"/></svg>`
+                  : `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>`}
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-bold text-sm text-slate-800 truncate">${taskPartyName(t)}</h4>
+                <div class="text-[10px] font-mono text-slate-400 font-bold">${t.id} • ${t.type.toUpperCase()}</div>
+              </div>
             </div>
-            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${t.status.replace('_', ' ')}</span>
+            <span class="text-[11px] font-bold px-2.5 py-1 rounded-full capitalize shrink-0 ${t.status === 'completed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${t.status.replace('_', ' ')}</span>
           </div>
-          <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 p-2 rounded-lg pl-3">
+          <div class="grid grid-cols-2 gap-2 text-xs bg-slate-50 border border-slate-100 p-3 rounded-xl">
             <div>
               <span class="text-slate-400 font-semibold block text-[10px] uppercase">Assigned Driver</span>
               <span class="text-slate-700 font-bold">${t.driver_name || 'Unassigned'}</span>
